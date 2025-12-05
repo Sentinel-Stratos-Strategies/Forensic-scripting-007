@@ -113,7 +113,8 @@ Students can get free access to GitHub Copilot:
 
 ### Open Source Maintainers
 Verified open-source maintainers can apply for free access:
-- **Application**: https://github.com/features/copilot#:~:text=for%20open%20source%20maintainers
+- Visit https://github.com/features/copilot and look for the "Open Source Maintainers" section
+- **GitHub Copilot for Open Source**: https://docs.github.com/en/copilot/managing-copilot/managing-copilot-as-an-individual-subscriber/getting-free-access-to-copilot-as-a-student-teacher-or-maintainer
 
 ## Troubleshooting
 
@@ -160,6 +161,6 @@ Review the terms of service before using GitHub Copilot:
 
 ---
 
-**Last Updated**: December 2025
+**Last Updated**: December 5, 2025
 
 For the most current information, always refer to the official GitHub Copilot documentation at https://docs.github.com/en/copilot
