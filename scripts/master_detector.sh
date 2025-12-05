@@ -1,8 +1,8 @@
 #!/bin/bash
-"""
-Master Detection Script for LLM/AI Forensics
-This script runs all detection methods and generates a comprehensive report.
-"""
+#
+# Master Detection Script for LLM/AI Forensics
+# This script runs all detection methods and generates a comprehensive report.
+#
 
 # Colors for output
 RED='\033[0;31m'
