@@ -13,6 +13,9 @@ from pathlib import Path
 
 
 class LogAnalyzer:
+    # Configuration constants
+    MAX_LOG_LINES_TO_SCAN = 10000  # Limit lines scanned per file for performance
+    
     def __init__(self):
         self.findings = []
         
@@ -158,8 +161,8 @@ class LogAnalyzer:
                             })
                             break
                     
-                    # Limit to first 10000 lines for performance
-                    if line_num > 10000:
+                    # Limit lines scanned for performance
+                    if line_num > self.MAX_LOG_LINES_TO_SCAN:
                         break
             
         except PermissionError:
@@ -189,7 +192,7 @@ class LogAnalyzer:
                             })
                             break
                     
-                    if line_num > 10000:
+                    if line_num > self.MAX_LOG_LINES_TO_SCAN:
                         break
             
         except PermissionError:

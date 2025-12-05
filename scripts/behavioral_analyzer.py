@@ -14,6 +14,10 @@ from collections import defaultdict
 
 
 class BehavioralAnalyzer:
+    # Configuration constants
+    LARGE_MEMORY_THRESHOLD_MB = 100  # MB - threshold for large anonymous memory regions
+    HIGH_THREAD_COUNT_THRESHOLD = 10  # Number of threads indicating parallel processing
+    
     def __init__(self, duration=60):
         self.duration = duration
         self.behavior_data = defaultdict(lambda: defaultdict(int))
@@ -161,8 +165,8 @@ class BehavioralAnalyzer:
                             end = int(addr_range[1], 16)
                             size = end - start
                             
-                            # Check for large anonymous regions (>100MB)
-                            if size > 100 * 1024 * 1024:
+                            # Check for large anonymous regions
+                            if size > self.LARGE_MEMORY_THRESHOLD_MB * 1024 * 1024:
                                 large_anon_regions += 1
                                 total_anon_size += size
             
@@ -194,7 +198,7 @@ class BehavioralAnalyzer:
                 thread_count = int(thread_match.group(1))
                 
                 # Check for high thread count (parallel inference)
-                if thread_count > 10:
+                if thread_count > self.HIGH_THREAD_COUNT_THRESHOLD:
                     return {
                         'pid': pid,
                         'thread_count': thread_count
