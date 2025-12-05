@@ -17,6 +17,7 @@ class BehavioralAnalyzer:
     # Configuration constants
     LARGE_MEMORY_THRESHOLD_MB = 100  # MB - threshold for large anonymous memory regions
     HIGH_THREAD_COUNT_THRESHOLD = 10  # Number of threads indicating parallel processing
+    SYSCALL_COUNT_THRESHOLD = 100  # Minimum syscall count to be considered suspicious
     
     def __init__(self, duration=60):
         self.duration = duration
@@ -94,7 +95,7 @@ class BehavioralAnalyzer:
         for syscall in self.suspicious_syscalls:
             if syscall in syscall_counts:
                 count = syscall_counts[syscall]
-                if count > 100:  # Threshold for suspicious activity
+                if count > self.SYSCALL_COUNT_THRESHOLD:  # Threshold for suspicious activity
                     suspicious_count += 1
                     details.append(f"{syscall}: {count} calls")
         

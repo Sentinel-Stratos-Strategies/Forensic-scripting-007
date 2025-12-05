@@ -14,6 +14,9 @@ from pathlib import Path
 
 
 class SignatureDetector:
+    # Configuration constants
+    MIN_MODEL_FILE_SIZE_MB = 1  # Minimum file size in MB to be considered a model file
+    
     def __init__(self):
         self.findings = []
         
@@ -256,8 +259,8 @@ class SignatureDetector:
                                     file_path = os.path.join(root, file)
                                     try:
                                         file_size = os.path.getsize(file_path)
-                                        # Only report files larger than 1MB (likely models)
-                                        if file_size > 1024 * 1024:
+                                        # Only report files larger than threshold (likely models)
+                                        if file_size > self.MIN_MODEL_FILE_SIZE_MB * 1024 * 1024:
                                             self.findings.append({
                                                 'type': 'model_file',
                                                 'framework': framework,
