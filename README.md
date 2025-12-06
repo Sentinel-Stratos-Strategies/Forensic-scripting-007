@@ -51,6 +51,14 @@ Detects AI activity and log tampering:
 - Suspicious commands in bash history
 - Timestamp gaps and anomalies
 
+### 5. **Credential & Tracker Artifact Sweep** (`credential_artifact_scanner.py`)
+Root-level scan for sensitive material and tracking artifacts:
+- Keychains, tokens, encryption keys, and account stores (JSON + SQLite)
+- BLE/"tracker" clues such as AirTag, Tile, and beacon names
+- Suspicious filenames (e.g., `keychain.db`, `tokens.json`) and schema matches
+- SQLite table/column/value inspection for `token`, `password`, `pair`, `sync`, `network`, etc.
+- Automatic JSON + SQLite reporting for follow-up queries
+
 ## 🚀 Quick Start
 
 ### Installation

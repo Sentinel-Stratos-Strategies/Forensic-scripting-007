@@ -79,6 +79,9 @@ run_detector "Behavioral_Analysis" "$SCRIPT_DIR/behavioral_analyzer.py" "-d 5"
 # 4. Log Analysis
 run_detector "Log_Analysis" "$SCRIPT_DIR/log_analyzer.py"
 
+# 5. Credential & Tracker Artifact Scan
+run_detector "Credential_Artifact_Scan" "$SCRIPT_DIR/credential_artifact_scanner.py"
+
 # Generate summary report
 echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
 echo -e "${GREEN}Generating Summary Report${NC}"
