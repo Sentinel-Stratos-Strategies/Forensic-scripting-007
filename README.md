@@ -51,6 +51,13 @@ Detects AI activity and log tampering:
 - Suspicious commands in bash history
 - Timestamp gaps and anomalies
 
+### 5. **Persistence Detection** (`persistence_detector.py`)
+Uncovers stealthy startup mechanisms that can relaunch hidden AI workloads:
+- Cron jobs pointing to model servers or API calls
+- systemd unit files with LLM/AI keywords or API keys
+- Shell profile hooks exporting AI credentials or aliases
+- Curl/wget beacons to public AI endpoints
+
 ## 🚀 Quick Start
 
 ### Installation
@@ -66,6 +73,22 @@ pip install -r requirements.txt
 # Make scripts executable
 chmod +x scripts/*.sh scripts/*.py
 ```
+
+### Download without git
+
+Prefer a one-time download instead of cloning? Grab the latest ZIP directly from GitHub and unpack it:
+
+```bash
+# Download the current main branch as a ZIP
+wget https://github.com/Sentinel-Stratos-Strategies/Forensic-scripting-007/archive/refs/heads/main.zip -O forensic-suite.zip
+
+# Unpack and enter the directory
+unzip forensic-suite.zip
+cd Forensic-scripting-007-main
+```
+
+For versioned bundles, use the Releases page and pick a tagged archive instead:
+https://github.com/Sentinel-Stratos-Strategies/Forensic-scripting-007/releases
 
 ### Basic Usage
 
