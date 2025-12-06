@@ -10,6 +10,8 @@ This suite provides multiple detection methods for identifying hidden AI/LLM pro
 - **Log Analysis**: Detects LLM activity and log tampering in system logs
 - **Persistence Detection**: Finds autorun mechanisms that can quietly restart AI workloads
 
+All detectors run locally and do not need internet access or API keys. If you want an offline LLM to help summarize results, see [LOCAL_LLM_OPTIONS](LOCAL_LLM_OPTIONS.md) for drop-in model suggestions.
+
 ## Quick Start
 
 ### Prerequisites

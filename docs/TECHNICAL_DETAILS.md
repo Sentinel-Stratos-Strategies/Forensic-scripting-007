@@ -4,6 +4,8 @@
 
 This document provides technical details about how each detection method works.
 
+**Offline by design:** All detectors execute locally without calling hosted APIs. Any references to API keys or provider domains are used strictly as indicators during scanning, not as dependencies. For optional local-only model helpers to interpret results, see [LOCAL_LLM_OPTIONS](LOCAL_LLM_OPTIONS.md).
+
 ## Anomaly Detector
 
 ### Process Name Analysis

@@ -15,7 +15,7 @@ This comprehensive forensic detection suite helps identify hidden AI/LLM process
 - Running unauthorized inference servers
 - Using system resources covertly
 - Manipulating system logs to hide their presence
-- Communicating with external AI/LLM APIs
+- Communicating with external AI/LLM APIs (optional; detectors themselves run offline)
 
 ## 🔍 Detection Methods
 
@@ -117,6 +117,10 @@ sudo python3 scripts/behavioral_analyzer.py
 # Log analysis
 sudo python3 scripts/log_analyzer.py
 ```
+
+### Offline and API-free operation
+
+All detectors run locally and do not require API keys or internet access. If you want a local LLM to summarize findings, pick one of the offline-friendly models listed in [docs/LOCAL_LLM_OPTIONS.md](docs/LOCAL_LLM_OPTIONS.md) and pipe the reports into it. No cloud calls are needed.
 
 ## 📊 Output
 
