@@ -67,6 +67,9 @@ echo -e "${GREEN}Starting Forensic Scan${NC}"
 echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
 echo ""
 
+# 0. Modification Timeline (run first to capture a temporal snapshot)
+run_detector "Modification_Timeline" "$SCRIPT_DIR/modification_timeline_scanner.py"
+
 # 1. Anomaly Detection
 run_detector "Anomaly_Detection" "$SCRIPT_DIR/anomaly_detector.py"
 
