@@ -111,7 +111,6 @@ class PersistenceDetector:
                                             "content": line[:200],
                                         }
                                     )
-                                    continue
 
                                 # Flag outbound calls to public AI endpoints
                                 if re.search(r"curl|wget", line, re.IGNORECASE) and re.search(

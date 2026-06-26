@@ -279,7 +279,7 @@ class BehavioralAnalyzer:
                     })
                 
                 # Monitor syscalls (requires root)
-                syscall_counts = self.monitor_strace_process(pid, duration=5)
+                syscall_counts = self.monitor_strace_process(pid, duration=self.duration)
                 if syscall_counts:
                     syscall_analysis = self.analyze_syscall_patterns(pid, syscall_counts)
                     if syscall_analysis:
@@ -289,7 +289,7 @@ class BehavioralAnalyzer:
                         })
                 
                 # Monitor file access (requires root)
-                suspicious_files = self.monitor_file_access(pid, duration=5)
+                suspicious_files = self.monitor_file_access(pid, duration=self.duration)
                 if suspicious_files:
                     self.suspicious_behaviors.append({
                         'type': 'file_access',
