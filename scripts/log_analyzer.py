@@ -112,31 +112,42 @@ class LogAnalyzer:
             # Parse timestamps and look for unusual gaps
             timestamps = []
             timestamp_patterns = [
-                r'(\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2})',  # ISO format
-                r'(\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})',  # syslog format
+                (r'(\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2})', 'iso'),  # ISO format
+                (r'(\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})', 'syslog'),  # syslog format
             ]
             
+            current_year = datetime.now().year
+            
             for line in lines[:1000]:  # Sample first 1000 lines
-                for pattern in timestamp_patterns:
+                for pattern, fmt_type in timestamp_patterns:
                     match = re.search(pattern, line)
                     if match:
                         try:
                             ts_str = match.group(1)
-                            # Simple timestamp extraction
-                            timestamps.append(ts_str)
+                            parsed_ts = self._parse_timestamp(ts_str, fmt_type, current_year)
+                            if parsed_ts:
+                                timestamps.append(parsed_ts)
                             break
                         except Exception:
                             continue
             
-            # Check for large gaps (>1 hour)
-            if len(timestamps) > 1:
-                # This is simplified; real analysis would parse timestamps properly
-                gaps.append({
-                    'type': 'timestamp_analysis',
-                    'file': log_file,
-                    'sample_count': len(timestamps),
-                    'note': 'Manual review recommended for gap analysis'
-                })
+            # Check for large gaps (>1 hour) between consecutive timestamps
+            gap_threshold_seconds = 3600  # 1 hour
+            for i in range(1, len(timestamps)):
+                prev_ts = timestamps[i - 1]
+                curr_ts = timestamps[i]
+                gap_seconds = (curr_ts - prev_ts).total_seconds()
+                
+                # Only report positive gaps exceeding the threshold
+                if gap_seconds > gap_threshold_seconds:
+                    gaps.append({
+                        'type': 'timestamp_analysis',
+                        'file': log_file,
+                        'start_time': prev_ts.isoformat(),
+                        'end_time': curr_ts.isoformat(),
+                        'gap_duration_seconds': gap_seconds,
+                        'gap_duration_human': str(timedelta(seconds=int(gap_seconds)))
+                    })
             
         except PermissionError:
             pass
@@ -144,6 +155,33 @@ class LogAnalyzer:
             pass
         
         return gaps
+
+    def _parse_timestamp(self, ts_str, fmt_type, current_year):
+        """Parse a timestamp string into a datetime object.
+        
+        Args:
+            ts_str: The timestamp string to parse
+            fmt_type: 'iso' for ISO format or 'syslog' for syslog format
+            current_year: The year to use for syslog timestamps (which lack year)
+        
+        Returns:
+            A datetime object or None if parsing fails
+        """
+        try:
+            if fmt_type == 'iso':
+                # Handle both space and 'T' separator
+                ts_str_normalized = ts_str.replace('T', ' ')
+                return datetime.strptime(ts_str_normalized, '%Y-%m-%d %H:%M:%S')
+            elif fmt_type == 'syslog':
+                # Syslog format: Mon DD HH:MM:SS (no year)
+                # Normalize whitespace (may have variable spacing between month and day)
+                ts_str_normalized = ' '.join(ts_str.split())
+                parsed = datetime.strptime(ts_str_normalized, '%b %d %H:%M:%S')
+                # Add current year since syslog format doesn't include it
+                return parsed.replace(year=current_year)
+        except ValueError:
+            return None
+        return None
 
     def search_llm_indicators(self, log_file):
         """Search for LLM/AI related entries in logs"""
@@ -418,11 +456,12 @@ class LogAnalyzer:
                 print()
         
         if findings_by_type['timestamp_analysis']:
-            print(f"\n[!] Found {len(findings_by_type['timestamp_analysis'])} log file(s) with timestamp gaps:")
+            print(f"\n[!] Found {len(findings_by_type['timestamp_analysis'])} timestamp gap(s) exceeding 1 hour:")
             for item in findings_by_type['timestamp_analysis'][:10]:
                 print(f"    File: {item['file']}")
-                print(f"    Samples: {item['sample_count']}")
-                print(f"    Note: {item['note']}")
+                print(f"    Gap start: {item['start_time']}")
+                print(f"    Gap end: {item['end_time']}")
+                print(f"    Duration: {item['gap_duration_human']} ({item['gap_duration_seconds']:.0f} seconds)")
                 print()
         
         print("\n" + "=" * 80)
