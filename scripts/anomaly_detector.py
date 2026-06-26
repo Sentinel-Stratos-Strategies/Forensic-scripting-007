@@ -102,6 +102,7 @@ class AnomalyDetector:
                         'status': conn.status
                     }
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            # Process state can change during scanning (exit/permission/zombie); ignore and continue.
             pass
         
         return None
