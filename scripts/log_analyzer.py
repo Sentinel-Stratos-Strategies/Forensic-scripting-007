@@ -343,7 +343,7 @@ class LogAnalyzer:
         for log_file in self.log_files:
             matches = self.search_llm_indicators(log_file)
             if matches:
-                for match in matches[:10]:  # Limit per file
+                for match in matches:
                     self.findings.append({
                         'type': 'llm_indicator',
                         **match
@@ -354,7 +354,7 @@ class LogAnalyzer:
         for log_file in self.log_files:
             tampering = self.search_tampering_commands(log_file)
             if tampering:
-                for item in tampering[:10]:
+                for item in tampering:
                     self.findings.append({
                         'type': 'tampering_indicator',
                         **item
