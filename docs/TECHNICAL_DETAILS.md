@@ -4,6 +4,8 @@
 
 This document provides technical details about how each detection method works.
 
+**Offline by design:** All detectors execute locally without calling hosted APIs. Any references to API keys or provider domains are used strictly as indicators during scanning, not as dependencies. For optional local-only model helpers to interpret results, see [LOCAL_LLM_OPTIONS](LOCAL_LLM_OPTIONS.md).
+
 ## Anomaly Detector
 
 ### Process Name Analysis
@@ -264,6 +266,35 @@ indicators = [
 **Patterns**: cuda, gpu, torch, model, inference
 
 **Records**: Pattern, match count, sample entry
+
+## Persistence Detector
+
+### Cron Analysis
+
+**Targets**:
+- `/etc/crontab`, `/etc/cron.d`, `/etc/cron.*`
+- `/var/spool/cron` and `/var/spool/cron/crontabs`
+
+**Detection Logic**:
+- Regex match for LLM keywords in scheduled commands
+- Flags API key exports or invocations hitting AI providers
+- Highlights curl/wget calls to `openai`, `anthropic`, `huggingface`, `cohere`, `ollama`, `replicate`, `hf.space`
+
+### Systemd Unit Inspection
+
+**Files Scanned**: `*.service` files in `/etc/systemd/system`, `/usr/lib/systemd/system`, `/lib/systemd/system`
+
+**Checks**:
+- `Description=` fields containing LLM indicators
+- `ExecStart=` commands referencing models, weights, tokens, or API keys
+
+### Shell Profile Hooks
+
+**Files Scanned**: `~/.bashrc`, `~/.profile`, `~/.zshrc`, `/etc/profile`, `/etc/bash.bashrc`, `/etc/zsh/zshrc`
+
+**Indicators**:
+- Exported AI API keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `HUGGINGFACEHUB_API_TOKEN`, `COHERE_API_KEY`, `AI21_API_KEY`)
+- Aliases or commands that launch model servers (e.g., `ollama`, `python -m ... serve`)
 
 ## Data Flow
 

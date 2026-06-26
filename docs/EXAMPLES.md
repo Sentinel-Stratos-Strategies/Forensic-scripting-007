@@ -399,7 +399,20 @@ python3 scripts/anomaly_detector.py
 kill $TEST_PID
 ```
 
-## Example 20: Comprehensive Security Audit
+## Example 20: Persistence Sweep
+
+Hunt for autorun hooks that could relaunch hidden AI workloads after reboot:
+
+```bash
+# Run the persistence detector
+python3 scripts/persistence_detector.py
+
+# Manually inspect suspicious entries
+sudo grep -R "gpt\|llm\|model" /etc/systemd/system /etc/cron.* 2>/dev/null | head
+sudo grep -R "OPENAI_API_KEY\|ANTHROPIC_API_KEY" ~/.bashrc ~/.profile /etc/profile 2>/dev/null | head
+```
+
+## Example 21: Comprehensive Security Audit
 
 Full security audit script:
 

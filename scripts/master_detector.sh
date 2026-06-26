@@ -76,7 +76,10 @@ run_detector "Signature_Detection" "$SCRIPT_DIR/signature_detector.py"
 # 3. Behavioral Analysis
 run_detector "Behavioral_Analysis" "$SCRIPT_DIR/behavioral_analyzer.py" "-d 5"
 
-# 4. Log Analysis
+# 4. Persistence Detection
+run_detector "Persistence_Detection" "$SCRIPT_DIR/persistence_detector.py"
+
+# 5. Log Analysis
 run_detector "Log_Analysis" "$SCRIPT_DIR/log_analyzer.py"
 
 # Generate summary report
