@@ -1,4 +1,5 @@
 #!/bin/bash
+set -o pipefail
 #
 # Master Detection Script for LLM/AI Forensics
 # This script runs all detection methods and generates a comprehensive report.
