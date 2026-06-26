@@ -87,10 +87,19 @@ class LogAnalyzer:
                     'permissions': mode
                 })
             
-        except PermissionError:
-            pass
+        except PermissionError as e:
+            issues.append({
+                'type': 'integrity_check_permission_error',
+                'file': log_file,
+                'error': str(e)
+            })
         except Exception as e:
-            pass
+            issues.append({
+                'type': 'integrity_check_error',
+                'file': log_file,
+                'error_type': type(e).__name__,
+                'error': str(e)
+            })
         
         return issues
 
