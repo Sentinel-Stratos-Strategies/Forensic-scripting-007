@@ -398,11 +398,16 @@ Generate console report + JSON export
 
 ## Security Implications
 
-### Read-Only Operations
-All scripts are **read-only**:
-- No process termination
-- No file modification
-- No system configuration changes
+### Read-Only Scanning, Write-Based Reporting
+Scanning operations are **read-only** with respect to the target system:
++- No process termination
++- No system configuration changes
+
+However, the suite **does write** output artifacts:
++- Creates `forensic_reports_*` output directories
++- Writes `*_report.json` and `SUMMARY_REPORT.txt` files
+
+**Recommendation**: Run with a writable, dedicated output location; avoid read-only mounts or sensitive evidence directories as the output path.
 
 ### Information Disclosure
 Reports may contain:
