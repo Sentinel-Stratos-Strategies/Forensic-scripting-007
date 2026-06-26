@@ -140,6 +140,10 @@ class BehavioralAnalyzer:
             
             return suspicious_files
             
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.communicate()
+            return []
         except Exception as e:
             print(f"[!] Error monitoring file access: {e}")
             return []
