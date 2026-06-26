@@ -200,7 +200,7 @@ class PersistenceDetector:
                                     "content": line[:200],
                                 }
                             )
-                        elif re.search(r"alias .*ollama|python.*-m.*serve", line, re.IGNORECASE):
+                        elif re.search(r"alias .*(ollama|python.*-m.*serve)", line, re.IGNORECASE):
                             self.findings.append(
                                 {
                                     "type": "shell_alias",
