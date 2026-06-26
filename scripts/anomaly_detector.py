@@ -75,6 +75,8 @@ class AnomalyDetector:
                 })
                 
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            # Expected during process scanning: processes may exit, become zombies,
+            # or be inaccessible due to permissions. Skip and continue.
             pass
         
         return anomalies
