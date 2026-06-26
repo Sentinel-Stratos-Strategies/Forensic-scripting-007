@@ -260,13 +260,15 @@ capture_login_and_codex_history() {
 }
 
 capture_pcap_glob() {
-  local app_name="$1" glob="$2" case_dir="$3" p
+  local app_name="$1" glob="$2" case_dir="$3" p index=0
   local pcap_dir="$case_dir/pcaps"
   [[ -z "$glob" ]] && return 0
   mkdir -p "$pcap_dir"
   compgen -G "$glob" > "$pcap_dir/matched_pcaps.txt" || true
   while IFS= read -r p; do
-    [[ -n "$p" ]] && capture_path_artifact "$app_name" network pcap "$p" "$pcap_dir/$(safe_name "$(basename "$p")")"
+    [[ -z "$p" ]] && continue; index=$((index+1))
+    local stem; stem="$(printf '%05d_%s' "$index" "$(safe_name "$(basename "$p")")")"
+    capture_path_artifact "$app_name" network pcap "$p" "$pcap_dir/$stem"
   done < "$pcap_dir/matched_pcaps.txt"
 }
 
@@ -291,13 +293,15 @@ record_short_pcap() {
   printf 'tcpdump_exit_status=%s\n' "$status" > "$pcap_dir/tcpdump.status"
 }
 capture_extra_glob() {
-  local app_name="$1" glob="$2" case_dir="$3" p
+  local app_name="$1" glob="$2" case_dir="$3" p index=0
   local extra_dir="$case_dir/extra_artifacts"
   [[ -z "$glob" ]] && return 0
   mkdir -p "$extra_dir"
   compgen -G "$glob" > "$extra_dir/matched_paths.txt" || true
   while IFS= read -r p; do
-    [[ -n "$p" ]] && capture_path_artifact "$app_name" extra extra "$p" "$extra_dir/$(safe_name "$(basename "$p")")"
+    [[ -z "$p" ]] && continue; index=$((index+1))
+    local stem; stem="$(printf '%05d_%s' "$index" "$(safe_name "$(basename "$p")")")"
+    capture_path_artifact "$app_name" extra extra "$p" "$extra_dir/$stem"
   done < "$extra_dir/matched_paths.txt"
 }
 
