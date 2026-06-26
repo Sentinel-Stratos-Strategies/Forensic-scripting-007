@@ -455,6 +455,7 @@ EOF2
 
 log "Run directory: $RUN_DIR"; cp "$MANIFEST" "$RUN_DIR/manifest.csv"
 record_tool_status python3 find file stat xattr strings codesign spctl plutil otool log sqlite3 zip tcpdump
+MANIFEST_TSV="$(parse_manifest)" || { echo "[FATAL] parse_manifest failed" >&2; exit 1; }
 while IFS=$'\t' read -r name suspect_app baseline_app process_match pcap_glob extra_glob iface pcap_seconds; do
   [[ -z "$name" ]] && continue; case_dir="$RUN_DIR/$(safe_name "$name")"; mkdir -p "$case_dir"; : > "$case_dir/bundle_ids.all"
   log "=== Capturing case: $name ==="
@@ -462,7 +463,7 @@ while IFS=$'\t' read -r name suspect_app baseline_app process_match pcap_glob ex
   capture_static_bundle "$name" baseline "$baseline_app" "$case_dir"; recursive_inventory_bundle "$name" baseline "$baseline_app" "$case_dir"
   capture_processes "$name" "$process_match" "$case_dir"; capture_user_tcc "$case_dir"; capture_logs "$name" "$process_match" "$case_dir"; capture_login_and_codex_history "$case_dir"
   capture_pcap_glob "$name" "$pcap_glob" "$case_dir"; record_short_pcap "$iface" "${pcap_seconds:-0}" "$case_dir"; capture_extra_glob "$name" "$extra_glob" "$case_dir"; write_case_docs "$name" "$case_dir"
-done < <(parse_manifest)
+done <<< "$MANIFEST_TSV"
 
 run_triage_targets "$TRIAGE_TARGETS" "$RUN_DIR"
 build_timeline
