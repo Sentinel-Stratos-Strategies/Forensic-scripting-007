@@ -115,7 +115,7 @@ class PersistenceDetector:
 
                                 # Flag outbound calls to public AI endpoints
                                 if re.search(r"curl|wget", line, re.IGNORECASE) and re.search(
-                                    r"openai|anthropic|huggingface|cohere|ollama|replicate|hf.space",
+                                    r"openai|anthropic|huggingface|cohere|ollama|replicate|hf\.space",
                                     line,
                                     re.IGNORECASE,
                                 ):
