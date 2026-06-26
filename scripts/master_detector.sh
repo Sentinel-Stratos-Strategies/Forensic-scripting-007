@@ -43,12 +43,32 @@ run_detector() {
     echo "----------------------------------------"
     
     if [ -f "$script" ]; then
+        # Snapshot existing report files before running detector
+        local existing_reports=()
+        for f in *_report.json; do
+            if [ -f "$f" ]; then
+                existing_reports+=("$f")
+            fi
+        done
+        
         python3 "$script" $args 2>&1 | tee "$OUTPUT_DIR/${name}_output.txt"
         
-        # Move JSON reports to output directory
+        # Move only newly created JSON reports to output directory
         for json_file in *_report.json; do
             if [ -f "$json_file" ]; then
-                mv "$json_file" "$OUTPUT_DIR/"
+                # Check if file was pre-existing
+                local is_existing=0
+                for existing in "${existing_reports[@]}"; do
+                    if [ "$json_file" = "$existing" ]; then
+                        is_existing=1
+                        break
+                    fi
+                done
+                
+                # Only move if this is a newly created file
+                if [ $is_existing -eq 0 ]; then
+                    mv "$json_file" "$OUTPUT_DIR/"
+                fi
             fi
         done
         
