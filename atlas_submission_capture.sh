@@ -106,7 +106,7 @@ record_tool_status() {
   done
 }
 sanitize_log_term() {
-  printf '%s' "$1" | tr -d "'" | cut -c 1-120
+  printf '%s' "$1" | tr -d "'\\" | cut -c 1-120
 }
 file_size() { stat -f '%z' "$1" 2>/dev/null || stat -c '%s' "$1" 2>/dev/null || true; }
 birth_time() { stat -f '%SB' -t '%Y-%m-%dT%H:%M:%SZ' "$1" 2>/dev/null || true; }
