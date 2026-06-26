@@ -75,7 +75,7 @@ class PersistenceDetector:
         ]
 
     def _line_has_indicator(self, line: str) -> bool:
-        return any(re.search(keyword, line, re.IGNORECASE) for keyword in self.llm_keywords)
+        return any(keyword.lower() in line.lower() for keyword in self.llm_keywords)
 
     def _line_has_api_key(self, line: str) -> bool:
         return any(key in line for key in self.api_keywords)
