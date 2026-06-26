@@ -36,7 +36,7 @@ class BehavioralAnalyzer:
         
         # File access patterns
         self.suspicious_file_patterns = [
-            r'\.pt$', r'\.pth$', r'\.pb$', r'\.h5$', r'\.onnx$',
+            r'\.pt', r'\.pth', r'\.pb', r'\.h5', r'\.onnx',
             r'model', r'checkpoint', r'config\.json', r'tokenizer'
         ]
 
