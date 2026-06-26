@@ -231,12 +231,12 @@ capture_logs() {
   local log_dir="$case_dir/logs"
   safe_match="$(sanitize_log_term "$match")"
   mkdir -p "$log_dir"
-  if ! have log; then
+  if ! [ -x /usr/bin/log ]; then
     printf 'macOS log command unavailable\n' > "$log_dir/unavailable.txt"
     return 0
   fi
-  log show --last 30m --style compact --predicate 'process == "tccd"' > "$log_dir/tccd_last30m.txt" 2> "$log_dir/tccd.stderr" || true
-  log show --last 30m --style compact --predicate "eventMessage CONTAINS[c] '$safe_match' OR process CONTAINS[c] '$safe_match' OR eventMessage CONTAINS[c] 'camera' OR eventMessage CONTAINS[c] 'microphone' OR eventMessage CONTAINS[c] 'screen'" > "$log_dir/privacy_filtered_last30m.txt" 2> "$log_dir/privacy_filtered.stderr" || true
+  /usr/bin/log show --last 30m --style compact --predicate 'process == "tccd"' > "$log_dir/tccd_last30m.txt" 2> "$log_dir/tccd.stderr" || true
+  /usr/bin/log show --last 30m --style compact --predicate "eventMessage CONTAINS[c] '$safe_match' OR process CONTAINS[c] '$safe_match' OR eventMessage CONTAINS[c] 'camera' OR eventMessage CONTAINS[c] 'microphone' OR eventMessage CONTAINS[c] 'screen'" > "$log_dir/privacy_filtered_last30m.txt" 2> "$log_dir/privacy_filtered.stderr" || true
   printf '%s\n' "$app_name" > "$log_dir/app_name.txt"
 }
 
