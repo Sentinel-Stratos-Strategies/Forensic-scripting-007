@@ -29,11 +29,14 @@ USAGE
 }
 
 MANIFEST="${1:-}"
-OUT_BASE="${2:-$PWD}"
-shift $(( $# >= 1 ? 1 : 0 )) || true
-shift $(( $# >= 1 ? 1 : 0 )) || true
+OUT_BASE="$PWD"
+[[ $# -ge 1 ]] && shift
+if [[ $# -ge 1 && "${1}" != -* ]]; then
+  OUT_BASE="$1"
+  shift
+fi
 PCAP_DURATION=0
-PCAP_INTERFACE="any"
+PCAP_INTERFACE=""
 LOG_LOOKBACK="2h"
 MAKE_ZIP=1
 
@@ -135,8 +138,11 @@ collect_pcap(){
   local case_dir="$1" glob="$2"; mkdir -p "$case_dir/pcap"
   copy_if_present "$glob" "$case_dir/pcap/provided"
   if (( PCAP_DURATION > 0 )) && command -v tcpdump >/dev/null; then
-    log "Starting tcpdump for ${PCAP_DURATION}s on $PCAP_INTERFACE"
-    tcpdump -i "$PCAP_INTERFACE" -s 0 -w "$case_dir/pcap/live_capture.pcap" >"$case_dir/pcap/tcpdump.stdout" 2>"$case_dir/pcap/tcpdump.stderr" &
+    log "Starting tcpdump for ${PCAP_DURATION}s${PCAP_INTERFACE:+ on $PCAP_INTERFACE}"
+    local tcpdump_cmd=(tcpdump)
+    [[ -n "$PCAP_INTERFACE" ]] && tcpdump_cmd+=(-i "$PCAP_INTERFACE")
+    tcpdump_cmd+=(-s 0 -w "$case_dir/pcap/live_capture.pcap")
+    "${tcpdump_cmd[@]}" >"$case_dir/pcap/tcpdump.stdout" 2>"$case_dir/pcap/tcpdump.stderr" &
     local pid=$!; sleep "$PCAP_DURATION"; kill -INT "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true
   fi
   find "$case_dir/pcap" -type f -print0 2>/dev/null | xargs -0 shasum -a 256 > "$case_dir/pcap/pcap_hashes.sha256" 2>/dev/null || true
