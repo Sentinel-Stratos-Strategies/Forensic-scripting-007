@@ -216,10 +216,18 @@ class LogAnalyzer:
                     if line_num > self.MAX_LOG_LINES_TO_SCAN:
                         break
             
-        except PermissionError:
-            pass
+        except PermissionError as e:
+            self.findings.append({
+                'type': 'scan_warning',
+                'severity': 'low',
+                'description': f'Permission denied while scanning {log_file}: {e}'
+            })
         except Exception as e:
-            pass
+            self.findings.append({
+                'type': 'scan_warning',
+                'severity': 'low',
+                'description': f'Error scanning {log_file} for LLM indicators: {e}'
+            })
         
         return matches
 
@@ -246,10 +254,18 @@ class LogAnalyzer:
                     if line_num > self.MAX_LOG_LINES_TO_SCAN:
                         break
             
-        except PermissionError:
-            pass
+        except PermissionError as e:
+            self.findings.append({
+                'type': 'scan_warning',
+                'severity': 'low',
+                'description': f'Permission denied while scanning {log_file}: {e}'
+            })
         except Exception as e:
-            pass
+            self.findings.append({
+                'type': 'scan_warning',
+                'severity': 'low',
+                'description': f'Error scanning {log_file} for tampering indicators: {e}'
+            })
         
         return tampering
 
