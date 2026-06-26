@@ -103,7 +103,11 @@ class LogAnalyzer:
                 return gaps
             
             with open(log_file, 'r', errors='ignore') as f:
-                lines = f.readlines()
+                lines = []
+                for line in f:
+                    lines.append(line)
+                    if len(lines) >= 1000:
+                        break
             
             # Parse timestamps and look for unusual gaps
             timestamps = []
