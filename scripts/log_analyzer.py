@@ -417,6 +417,14 @@ class LogAnalyzer:
                 print(f"    Matches: {item['match_count']}")
                 print()
         
+        if findings_by_type['timestamp_analysis']:
+            print(f"\n[!] Found {len(findings_by_type['timestamp_analysis'])} log file(s) with timestamp gaps:")
+            for item in findings_by_type['timestamp_analysis'][:10]:
+                print(f"    File: {item['file']}")
+                print(f"    Samples: {item['sample_count']}")
+                print(f"    Note: {item['note']}")
+                print()
+        
         print("\n" + "=" * 80)
 
     def export_json(self, filename='log_analysis_report.json'):
