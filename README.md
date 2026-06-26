@@ -68,7 +68,7 @@ git clone https://github.com/Sentinel-Stratos-Strategies/Forensic-scripting-007.
 cd Forensic-scripting-007
 
 # Install dependencies
-pip install -r requirements.txt
+# pip install -r requirements.txt (if/when added)
 
 # Make scripts executable
 chmod +x scripts/*.sh scripts/*.py
