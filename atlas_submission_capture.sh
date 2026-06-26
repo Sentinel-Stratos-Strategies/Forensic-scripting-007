@@ -92,7 +92,11 @@ write_sha256_manifest() {
     [[ "$file" == "$manifest" ]] && continue
     hash="$(sha256_file "$file" 2>/dev/null || true)"
     rel="${file#"$root/"}"
-    printf '%s  %s\n' "$hash" "$rel" >> "$manifest"
+    if [[ -z "$hash" ]]; then
+      printf 'HASH_ERROR  %s\n' "$rel" >> "$manifest"
+    else
+      printf '%s  %s\n' "$hash" "$rel" >> "$manifest"
+    fi
   done < <(find "$root" -type f -print0 | sort -z)
 }
 record_tool_status() {
