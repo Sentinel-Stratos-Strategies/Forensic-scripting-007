@@ -53,7 +53,10 @@ for src in "${SOURCES[@]}"; do
     if [[ -L "$p" ]]; then kind=symlink; link="$(readlink "$p" 2>/dev/null || true)"; desc="$(file -b -h "$p" 2>/dev/null || true)"; elif [[ -d "$p" ]]; then kind=directory; desc=directory; elif [[ -f "$p" ]]; then kind=file; count=$((count+1)); if (( LIMIT_FILES>0 && count>LIMIT_FILES )); then partial=1; break; fi; desc="$(file -b "$p" 2>/dev/null || true)"; cls="$(classify "$p" "$desc")"; should_hash "$cls" && hash="$(sha "$p")"; verify_static "$p" "$rel" "$cls" "$dir"; fi
     statline="$(stat -f '%Sp|%u|%g|%z|%m|%B|%Sf' "$p" 2>/dev/null || true)"
     IFS='|' read -r mode uid gid size mt bt flags <<< "$statline" || true
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$rel" "$kind" "${mode:-}" "${uid:-}" "${gid:-}" "${size:-}" "$(iso "${mt:-0}")" "$(iso "${bt:-0}")" "${flags:-}" "$hash" "$cls" "$desc" "$link" >> "$dir/objects.tsv"
+    rel_e="${rel//$'\t'/\\t}"; rel_e="${rel_e//$'\n'/\\n}"
+    desc_e="${desc//$'\t'/\\t}"; desc_e="${desc_e//$'\n'/\\n}"
+    link_e="${link//$'\t'/\\t}"; link_e="${link_e//$'\n'/\\n}"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$rel_e" "$kind" "${mode:-}" "${uid:-}" "${gid:-}" "${size:-}" "$(iso "${mt:-0}")" "$(iso "${bt:-0}")" "${flags:-}" "$hash" "$cls" "$desc_e" "$link_e" >> "$dir/objects.tsv"
   done < <(find "$root" -xdev -print0 2>>"$dir/find_errors.log")
   find "$root" \( -name '*.app' -o -name '*.xpc' -o -name '*.framework' -o -name '*.pkg' -o -name '*.dmg' \) -print > "$dir/containers.txt" 2>/dev/null || true
   while IFS= read -r c; do codesign --verify --deep --strict --verbose=4 "$c" > "$dir/static/$(safe "container_$c")_codesign.txt" 2>&1 || true; spctl --assess --verbose=4 "$c" > "$dir/static/$(safe "container_$c")_spctl.txt" 2>&1 || true; done < "$dir/containers.txt"
