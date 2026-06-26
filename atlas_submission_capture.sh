@@ -120,13 +120,22 @@ collect_global_context(){
   run_capture "$RUN_DIR/context/system_profiler.txt" system_profiler SPSoftwareDataType SPHardwareDataType
   run_capture "$RUN_DIR/context/logins_last.txt" last
   run_capture "$RUN_DIR/context/current_users_who.txt" who
-  run_capture "$RUN_DIR/context/deleted_codex_history_hits.txt" sh -c 'for f in "$HOME"/.{bash,zsh,fish}_history "$HOME"/.local/share/fish/fish_history; do [ -f "$f" ] && printf "--- %s ---\n" "$f" && rg -n -i "codex|deleted|rm |trash|unlink" "$f"; done'
+  run_capture "$RUN_DIR/context/deleted_codex_history_hits.txt" sh -c 'for f in "$HOME"/.{bash,zsh,fish}_history "$HOME"/.local/share/fish/fish_history; do [ -f "$f" ] && printf -- "--- %s ---\n" "$f" && rg -n -i "codex|deleted|rm |trash|unlink" "$f"; done'
 }
 
 collect_tcc(){
   local case_dir="$1" ids_file="$2"; mkdir -p "$case_dir/tcc"
   local db="$HOME/Library/Application Support/com.apple.TCC/TCC.db"
-  if [[ -r "$db" ]]; then sqlite3 -header -csv "$db" 'select service,client,client_type,auth_value,auth_reason,auth_version,indirect_object_identifier,last_modified from access order by last_modified desc;' > "$case_dir/tcc/user_tcc_access.csv" 2>"$case_dir/tcc/sqlite_error.txt" || true; fi
+  if [[ -r "$db" ]]; then
+    cp -p "$db" "$case_dir/tcc/tcc_snapshot.db" 2>>"$LOG" || true
+    chmod 444 "$case_dir/tcc/tcc_snapshot.db" 2>>"$LOG" || true
+    shasum -a 256 "$db" > "$case_dir/tcc/tcc_original_hashes.sha256" 2>>"$LOG" || true
+    [[ -f "$case_dir/tcc/tcc_snapshot.db" ]] && shasum -a 256 "$case_dir/tcc/tcc_snapshot.db" > "$case_dir/tcc/tcc_snapshot_hashes.sha256" 2>>"$LOG" || true
+    sqlite3 -header -csv "$db" 'select service,client,client_type,auth_value,auth_reason,auth_version,indirect_object_identifier,last_modified from access order by last_modified desc;' > "$case_dir/tcc/user_tcc_access.csv" 2>"$case_dir/tcc/sqlite_error.txt" || true
+    if [[ -f "$case_dir/tcc/tcc_snapshot.db" && -x "./scripts/credential_artifact_scanner.py" ]]; then
+      python3 ./scripts/credential_artifact_scanner.py --target "$case_dir/tcc/tcc_snapshot.db" --output "$case_dir/tcc/credential_triage_hits.tsv" >>"$LOG" 2>&1 || true
+    fi
+  fi
   : > "$case_dir/tcc/target_rows.csv"
   while IFS= read -r bid; do [[ -n "$bid" && -f "$case_dir/tcc/user_tcc_access.csv" ]] && rg -i --fixed-strings "$bid" "$case_dir/tcc/user_tcc_access.csv" >> "$case_dir/tcc/target_rows.csv" || true; done < "$ids_file"
   run_capture "$case_dir/tcc/tccd_recent.log" log show --style syslog --last "$LOG_LOOKBACK" --predicate 'process == "tccd" OR eventMessage CONTAINS[c] "TCC"'
@@ -155,6 +164,14 @@ csv_to_tsv "$MANIFEST" | while IFS=$'\t' read -r name suspect baseline proc pcap
   log "Collecting case: $name"
   summarize_bundle "$name" suspect "$suspect" "$case_dir/suspect"
   summarize_bundle "$name" baseline "$baseline" "$case_dir/baseline"
+  if [[ -x "./scripts/modification_timeline_scanner.py" ]]; then
+    timeline_targets=()
+    [[ -e "$suspect" ]] && timeline_targets+=(--target "$suspect")
+    [[ -e "$baseline" ]] && timeline_targets+=(--target "$baseline")
+    if ((${#timeline_targets[@]})); then
+      python3 ./scripts/modification_timeline_scanner.py "${timeline_targets[@]}" --output "$case_dir/modification_timeline.tsv" >>"$LOG" 2>&1 || true
+    fi
+  fi
   { bundle_id_for "$suspect"; bundle_id_for "$baseline"; awk -F'\t' 'NR>1 && $7 {print $7}' "$case_dir"/*/recursive_inventory.tsv 2>/dev/null || true; } | sort -u > "$case_dir/bundle_ids.txt"
   collect_process "$case_dir" "$proc"
   collect_tcc "$case_dir" "$case_dir/bundle_ids.txt"
