@@ -19,7 +19,7 @@ class PersistenceDetector:
     """Detects AI/LLM persistence mechanisms across the system."""
 
     def __init__(self) -> None:
-        self.findings: List[Dict[str, str]] = []
+        self.findings: List[Dict[str, object]] = []
 
         # Indicators that hint at AI/LLM workloads
         self.llm_keywords = [
