@@ -29,9 +29,12 @@ USAGE
 }
 
 MANIFEST="${1:-}"
-OUT_BASE="${2:-$PWD}"
-shift $(( $# >= 1 ? 1 : 0 )) || true
-shift $(( $# >= 1 ? 1 : 0 )) || true
+OUT_BASE="$PWD"
+[[ $# -ge 1 ]] && shift
+if [[ $# -ge 1 && "${1}" != -* ]]; then
+  OUT_BASE="$1"
+  shift
+fi
 PCAP_DURATION=0
 PCAP_INTERFACE=""
 LOG_LOOKBACK="2h"
