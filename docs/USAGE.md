@@ -16,7 +16,7 @@ All detectors run locally and do not need internet access or API keys. If you wa
 
 ### Prerequisites
 
-1. **Python 3.6+** is required
+1. **Python 3.7+** is required
 2. Install dependencies:
    ```bash
    pip install -r requirements.txt
