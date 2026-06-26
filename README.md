@@ -39,7 +39,7 @@ Optional triage target matrix:
 
 ```csv
 label,pattern,scope,severity,notes
-email,[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,},run,medium,Find email-like indicators
+email,[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,},run,medium,Find email-like indicators
 phone,\+?[0-9][0-9 .()-]{7,}[0-9],run,medium,Find phone-like indicators
 mdm_terms,MDM|DeviceEnrollment|profiles|configuration profile,run,high,Enrollment/configuration language
 disk_seal,seal|sealed|disk image|dmg|hdiutil|apfs,run,high,Disk image or seal manipulation language
