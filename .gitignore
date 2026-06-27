@@ -1,0 +1,30 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# Local virtual environments and Python caches
+.venv/
+.venv-*/
+venv/
+__pycache__/
+*.py[cod]
+
+# Local archives, extracted evidence, and generated reports
+*.zip
+Archive/
+bug_bounty_evidence_*/
+atlas_submission_capture_*/
+ATLAS_EVIDENCE_*/
+forensic_suite_*/
+forensic_reports_*/
+results/
+*.pcap
+*.pcapng
+
+# Accidental nested checkouts / local working copies
+Forensic-scripting-007/
+Users/
+
+# Local Codex/Superpowers planning notes
+docs/superpowers/
