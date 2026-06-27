@@ -1,20 +1,30 @@
 # Forensic-scripting-007
 
-## CREATIVE FORENSICS & LLM DETECTION
+Read-only macOS forensic helper scripts for bug bounty evidence packets.
 
-Think outside the box. AI/LLMs can mimic system processes, hide in daemons, or manipulate logs. Explore unconventional methods like anomaly detection, signature-based detection, and behavioral analysis. Use tools such as htop, Wireshark, and grep. Submit scripts with clear instructions and dependencies.
+## Scripts
+
+- `atlas_submission_capture.sh` builds a reviewer-friendly app comparison packet from a CSV manifest. It recursively inventories suspect and baseline app bundles, captures code-signing/notarization output, TCC rows, recent `tccd` logs, process state, optional PCAPs, terminal context, login history, deleted/Codex-related shell-history hits, hashes, and an optional zip archive.
+- `scripts/credential_artifact_scanner.py` opens a copied TCC SQLite database read-only and exports high-risk Atlas/OpenAI/OwlBridge privacy permission hits to TSV for fast reviewer triage.
+- `scripts/modification_timeline_scanner.py` builds a static modification timeline TSV for one or more evidence paths without executing target binaries.
+- `recursive_macos_volume_verify.sh` recursively inventories a mounted macOS volume, folder, app bundle, package, or evidence directory. It hashes and statically verifies code-like files without executing target code.
+
+## Quick start
+
+```bash
+cat > manifest.csv <<'CSV'
+name,suspect_app,baseline_app,process_match,pcap_glob,extra_glob
+Atlas,/Applications/ChatGPT Atlas.app,/Applications/ChatGPT Atlas Fresh.app,ChatGPT Atlas,,
+CSV
+
+./atlas_submission_capture.sh manifest.csv ./results --pcap-duration 0
+./recursive_macos_volume_verify.sh --out-base ./results --case atlas_recursive "/Applications/ChatGPT Atlas.app"
+python3 scripts/credential_artifact_scanner.py --target ./results/tcc_snapshot.db --output ./results/credential_triage_hits.tsv
+python3 scripts/modification_timeline_scanner.py --target "/Applications/ChatGPT Atlas.app" --output ./results/modification_timeline.tsv --hash
+```
+
+Both scripts are intentionally conservative: no `sudo`, no bundle mutation, no quarantine stripping, and no execution of suspect binaries.
 
 ## Resources
 
-### GitHub Codex and Copilot
-Looking for information about GitHub Codex and Copilot? Check out our comprehensive guide:
-- **[Codex & Copilot Guide](CODEX_COPILOT_GUIDE.md)** - Learn how to download, install, and use GitHub Copilot powered by OpenAI Codex
-
-This guide includes:
-- What GitHub Copilot and Codex are
-- How to sign up and subscribe
-- Installation instructions for various IDEs (VS Code, JetBrains, Visual Studio, Neovim)
-- Educational access for students and open source maintainers
-- Official documentation and resources
-- Troubleshooting tips
-
+- [Codex & Copilot Guide](CODEX_COPILOT_GUIDE.md) covers GitHub Copilot signup, IDE/CLI setup, educational access, official docs, and common authentication troubleshooting.
