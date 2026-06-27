@@ -24,3 +24,7 @@ python3 scripts/modification_timeline_scanner.py --target "/Applications/ChatGPT
 ```
 
 Both scripts are intentionally conservative: no `sudo`, no bundle mutation, no quarantine stripping, and no execution of suspect binaries.
+
+## Resources
+
+- [Codex & Copilot Guide](CODEX_COPILOT_GUIDE.md) covers GitHub Copilot signup, IDE/CLI setup, educational access, official docs, and common authentication troubleshooting.
