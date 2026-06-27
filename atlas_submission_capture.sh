@@ -143,6 +143,34 @@ collect_tcc(){
 
 collect_process(){ local case_dir="$1" match="$2"; mkdir -p "$case_dir/process"; [[ -n "$match" ]] || return 0; run_capture "$case_dir/process/pgrep.txt" pgrep -afil "$match"; run_capture "$case_dir/process/ps.txt" ps auxww; }
 
+collect_login_truth_scanner_audit(){
+  local case_dir="$1" proc_match="${2:-}" audit_dir="$case_dir/login_and_truth_scanner_audit"
+  mkdir -p "$audit_dir"
+  local history_files=(
+    "$HOME/.bash_history"
+    "$HOME/.zsh_history"
+    "$HOME/.fish_history"
+    "$HOME/.local/share/fish/fish_history"
+  )
+  : > "$audit_dir/codex_history_hits.txt"
+  local f base
+  for f in "${history_files[@]}"; do
+    [[ -f "$f" ]] || continue
+    base="$(basename "$f")"
+    {
+      printf -- "--- %s ---\n" "$f"
+      rg -n -i 'codex|truth[ _-]?scanner|truth scanner|atlas|openai|pcap|deleted|trash|unlink|rm ' "$f" || true
+    } >> "$audit_dir/codex_history_hits.txt"
+    {
+      printf -- "--- %s ---\n" "$f"
+      rg -n -i 'codex|/Applications/Codex\.app|rm[[:space:]]+-rf|trash|unlink|deleted' "$f" || true
+    } > "$audit_dir/${base}.deleted_codex.filtered.txt"
+  done
+  [[ -n "$proc_match" ]] && run_capture "$audit_dir/process_match_history_hits.txt" sh -c 'for f in "$HOME"/.{bash,zsh,fish}_history "$HOME"/.local/share/fish/fish_history; do [ -f "$f" ] && printf -- "--- %s ---\n" "$f" && rg -n -i -- "$1" "$f"; done' sh "$proc_match"
+  find "$HOME/.Trash" "$HOME/.Trash/"* "$HOME"/.Trash-*/ 2>/dev/null | rg -i 'codex|truth[ _-]?scanner|truth scanner|atlas|openai' > "$audit_dir/trash_codex_paths.txt" 2>/dev/null || true
+  find "$audit_dir" -type f -empty -delete 2>/dev/null || true
+}
+
 collect_pcap(){
   local case_dir="$1" glob="$2"; mkdir -p "$case_dir/pcap"
   copy_if_present "$glob" "$case_dir/pcap/provided"
@@ -174,6 +202,7 @@ csv_to_tsv "$MANIFEST" | while IFS=$'\t' read -r name suspect baseline proc pcap
   fi
   { bundle_id_for "$suspect"; bundle_id_for "$baseline"; awk -F'\t' 'NR>1 && $7 {print $7}' "$case_dir"/*/recursive_inventory.tsv 2>/dev/null || true; } | sort -u > "$case_dir/bundle_ids.txt"
   collect_process "$case_dir" "$proc"
+  collect_login_truth_scanner_audit "$case_dir" "$proc"
   collect_tcc "$case_dir" "$case_dir/bundle_ids.txt"
   collect_pcap "$case_dir" "$pcap_glob"
   copy_if_present "$extra_glob" "$case_dir/extra_artifacts"
