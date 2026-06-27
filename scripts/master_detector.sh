@@ -88,8 +88,8 @@ echo -e "${GREEN}Starting Forensic Scan${NC}"
 echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
 echo ""
 
-# 0. Modification Timeline (run first to capture a temporal snapshot)
-run_detector "Modification_Timeline" "$SCRIPT_DIR/modification_timeline_scanner.py"
+# 0. Filesystem Modification Timeline (run first to capture a temporal snapshot)
+run_detector "Filesystem_Modification_Timeline" "$SCRIPT_DIR/filesystem_modification_timeline.py"
 
 # 1. Anomaly Detection
 run_detector "Anomaly_Detection" "$SCRIPT_DIR/anomaly_detector.py"
@@ -106,8 +106,8 @@ run_detector "Persistence_Detection" "$SCRIPT_DIR/persistence_detector.py"
 # 5. Log Analysis
 run_detector "Log_Analysis" "$SCRIPT_DIR/log_analyzer.py"
 
-# 5. Credential & Tracker Artifact Scan
-run_detector "Credential_Artifact_Scan" "$SCRIPT_DIR/credential_artifact_scanner.py"
+# 6. Credential & Tracker Artifact Scan
+run_detector "Credential_Tracker_Sweep" "$SCRIPT_DIR/credential_tracker_sweep.py"
 
 # Generate summary report
 echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"

@@ -1,125 +1,84 @@
 #!/usr/bin/env python3
 """
-Filesystem Modification Timeline Scanner
+Modification Timeline Scanner
 
-This script walks the filesystem (default: root) and builds a timeline of
-recent file modifications. It is designed to be run before or alongside
-other detectors to give investigators temporal context about when files were
-last changed. No files are modified; the script only reads metadata.
+Builds a TSV timeline for files under one or more evidence paths without
+executing target binaries. Useful for quickly comparing bundle and artifact
+modification chronology in reviewer packets.
 """
 
-import json
+from __future__ import annotations
+
+import argparse
+import csv
+import hashlib
 import os
-from datetime import datetime
+import stat
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
 
 
-class ModificationTimelineScanner:
-    """Collects file metadata and outputs a modification timeline."""
+def iso_utc(epoch: float) -> str:
+    return datetime.fromtimestamp(epoch, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    def __init__(
-        self,
-        root: str = "/",
-        max_entries: int = 500,
-        exclude: Optional[List[str]] = None,
-        keyword_hints: Optional[List[str]] = None,
-    ) -> None:
-        self.root = Path(root)
-        self.max_entries = max_entries
-        self.exclude = set(exclude or ["/proc", "/sys", "/dev", "/run", "/tmp", "/var/tmp"])
-        self.keyword_hints = [hint.lower() for hint in (keyword_hints or [
-            "beacon",
-            "square",
-            "tile",
-            "airtag",
-            "bluetooth",
-            "ble",
-            "tracker",
-            "rtc",
-            "urtc",
-            "account",
-            "class",
-            "password",
-            "token",
-            "keychain",
-            "pair",
-            "sync",
-            "network",
-        ])]
-        self.records: List[Dict[str, str]] = []
 
-    def _is_excluded_dir(self, path: Path) -> bool:
-        return any(str(path).startswith(prefix) for prefix in self.exclude)
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
-    def _iter_files(self) -> Iterable[Path]:
-        for dirpath, dirnames, filenames in os.walk(self.root, topdown=True):
-            if self._is_excluded_dir(Path(dirpath)):
-                dirnames[:] = []
-                continue
 
-            dirnames[:] = [d for d in dirnames if not self._is_excluded_dir(Path(dirpath) / d)]
+def iter_paths(roots: list[Path]):
+    for root in roots:
+        if root.is_file() or root.is_symlink():
+            yield root
+            continue
+        for dirpath, dirnames, filenames in os.walk(root):
+            dirnames[:] = [d for d in dirnames if d not in {".git", "__pycache__"}]
+            for name in filenames:
+                yield Path(dirpath) / name
 
-            for filename in filenames:
-                yield Path(dirpath) / filename
 
-    def _keyword_match(self, path: Path) -> Optional[str]:
-        lower_name = path.name.lower()
-        for hint in self.keyword_hints:
-            if hint in lower_name:
-                return hint
-        return None
+def scan_timeline(targets: list[str], output_path: str, hash_files: bool) -> int:
+    roots = [Path(t) for t in targets]
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    rows = []
 
-    def scan(self) -> None:
-        print(f"[*] Building modification timeline from root: {self.root}")
-        collected = []
-
-        for path in self._iter_files():
+    for path in iter_paths(roots):
+        try:
+            st = path.lstat()
+        except OSError:
+            continue
+        mode = stat.filemode(st.st_mode)
+        digest = ""
+        if hash_files and path.is_file() and not path.is_symlink():
             try:
-                stat = path.stat()
+                digest = sha256_file(path)
             except OSError:
-                continue
+                digest = ""
+        rows.append((iso_utc(st.st_mtime), iso_utc(st.st_ctime), st.st_size, mode, digest, str(path)))
 
-            keyword = self._keyword_match(path)
-            collected.append(
-                {
-                    "path": str(path),
-                    "modified_time": datetime.utcfromtimestamp(stat.st_mtime).isoformat() + "Z",
-                    "size_bytes": stat.st_size,
-                    "keyword_hint": keyword or "",
-                }
-            )
-
-        collected.sort(key=lambda item: item["modified_time"], reverse=True)
-        self.records = collected[: self.max_entries]
-        print(f"[+] Collected {len(self.records)} timeline entries (max {self.max_entries})")
-
-    def write_json_report(self, report_path: str = "modification_timeline_report.json") -> None:
-        with open(report_path, "w", encoding="utf-8") as handle:
-            json.dump({"timeline": self.records}, handle, indent=2)
-        print(f"[+] JSON timeline report written to {report_path}")
-
-    def print_summary(self) -> None:
-        print("\n" + "=" * 80)
-        print("MODIFICATION TIMELINE SUMMARY")
-        print("=" * 80)
-        if not self.records:
-            print("No entries recorded.")
-            return
-
-        for item in self.records[:10]:
-            hint_text = f" | hint: {item['keyword_hint']}" if item["keyword_hint"] else ""
-            print(f"{item['modified_time']} | {item['path']}{hint_text}")
-
-        print("\nNote: showing up to 10 most recent entries for quick review.")
+    rows.sort(key=lambda row: (row[0], row[-1]))
+    with output.open("w", newline="") as tsvfile:
+        writer = csv.writer(tsvfile, delimiter="\t")
+        writer.writerow(["mtime_utc", "ctime_utc", "size_bytes", "mode", "sha256", "path"])
+        writer.writerows(rows)
+    print(f"[+] Timeline: Wrote {len(rows)} file record(s) to {output}")
+    return len(rows)
 
 
-def main() -> None:
-    scanner = ModificationTimelineScanner()
-    scanner.scan()
-    scanner.write_json_report()
-    scanner.print_summary()
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Build a modification timeline TSV for evidence paths.")
+    parser.add_argument("--target", action="append", required=True, help="File or directory to scan; may be repeated")
+    parser.add_argument("--output", required=True, help="Path to output TSV file")
+    parser.add_argument("--hash", action="store_true", help="Include SHA-256 hashes for regular files")
+    args = parser.parse_args()
+    scan_timeline(args.target, args.output, args.hash)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

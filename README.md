@@ -51,7 +51,7 @@ Detects AI activity and log tampering:
 - Suspicious commands in bash history
 - Timestamp gaps and anomalies
 
-### 5. **Credential & Tracker Artifact Sweep** (`credential_artifact_scanner.py`)
+### 5. **Credential & Tracker Artifact Sweep** (`credential_tracker_sweep.py`)
 Root-level scan for sensitive material and tracking artifacts:
 - Keychains, tokens, encryption keys, and account stores (JSON + SQLite)
 - BLE/"tracker" clues such as AirTag, Tile, and beacon names
@@ -59,7 +59,7 @@ Root-level scan for sensitive material and tracking artifacts:
 - SQLite table/column/value inspection for `token`, `password`, `pair`, `sync`, `network`, etc.
 - Automatic JSON + SQLite reporting for follow-up queries
 
-### 6. **Modification Timeline** (`modification_timeline_scanner.py`)
+### 6. **Filesystem Modification Timeline** (`filesystem_modification_timeline.py`)
 Chronological snapshot of recent file changes so you can review what moved when before diving into deeper detectors:
 - Scans from root (respecting safe exclusions) and sorts files by modification time
 - Highlights entries with credential/tracker-related name hints (beacon, token, keychain, etc.)
