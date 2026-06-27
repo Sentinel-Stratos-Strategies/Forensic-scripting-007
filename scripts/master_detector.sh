@@ -15,6 +15,8 @@ HASH_MODE="code"
 LIMIT_FILES=0
 PYTHON_BIN="${PYTHON:-python3}"
 MAX_TEXT_MB=16
+ALLOW_WRITABLE_SOURCE=0
+INSPECT_DMG_CONTENTS=0
 
 usage() {
   cat <<'USAGE'
@@ -27,6 +29,9 @@ Options:
   --hash-mode MODE     Recursive verifier hash mode: code|all|none (default: code)
   --limit-files N      Stop recursive verifier after N regular files per source (default: 0/unlimited)
   --max-text-mb N      Maximum text-file size searched by recursive verifier (default: 16)
+  --allow-writable     Permit recursive verifier to scan a writable source volume
+  --inspect-dmg-contents
+                       Mount DMGs read-only and inventory their contents
   --python PATH        Python interpreter to run detectors (default: python3 or $PYTHON)
   --no-recursive       Skip recursive volume verification
   -h, --help           Show help
@@ -43,6 +48,8 @@ while (($#)); do
     --hash-mode) HASH_MODE="${2:?missing hash mode}"; shift 2 ;;
     --limit-files) LIMIT_FILES="${2:?missing file limit}"; shift 2 ;;
     --max-text-mb) MAX_TEXT_MB="${2:?missing max text size}"; shift 2 ;;
+    --allow-writable) ALLOW_WRITABLE_SOURCE=1; shift ;;
+    --inspect-dmg-contents) INSPECT_DMG_CONTENTS=1; shift ;;
     --python) PYTHON_BIN="${2:?missing python path}"; shift 2 ;;
     --no-recursive) RUN_RECURSIVE=0; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -95,6 +102,8 @@ run_detector() {
   echo "hash_mode=$HASH_MODE"
   echo "limit_files=$LIMIT_FILES"
   echo "max_text_mb=$MAX_TEXT_MB"
+  echo "allow_writable_source=$ALLOW_WRITABLE_SOURCE"
+  echo "inspect_dmg_contents=$INSPECT_DMG_CONTENTS"
 } > "$OUTPUT_DIR/CASE_MANIFEST.txt"
 
 log "Output directory: $OUTPUT_DIR"
@@ -106,13 +115,17 @@ run_detector "Log_Analysis" "$REPO_ROOT/scripts/log_analyzer.py"
 
 if (( RUN_RECURSIVE )); then
   log "Running recursive macOS volume verifier against $INPUT_ROOT"
-  "$REPO_ROOT/recursive_macos_volume_verify.sh" \
+  recursive_cmd=("$REPO_ROOT/recursive_macos_volume_verify.sh" \
     --out-base "$OUTPUT_DIR" \
     --case "${CASE_NAME}_recursive" \
     --hash-mode "$HASH_MODE" \
     --limit-files "$LIMIT_FILES" \
     --max-text-mb "$MAX_TEXT_MB" \
-    "$INPUT_ROOT" >"$OUTPUT_DIR/recursive_verify.stdout" 2>"$OUTPUT_DIR/recursive_verify.stderr" || {
+  )
+  (( ALLOW_WRITABLE_SOURCE )) && recursive_cmd+=(--allow-writable)
+  (( INSPECT_DMG_CONTENTS )) && recursive_cmd+=(--inspect-dmg-contents)
+  recursive_cmd+=("$INPUT_ROOT")
+  "${recursive_cmd[@]}" >"$OUTPUT_DIR/recursive_verify.stdout" 2>"$OUTPUT_DIR/recursive_verify.stderr" || {
       printf '[WARN] recursive verifier exited non-zero\n' | tee -a "$LOG"
     }
 fi

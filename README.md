@@ -14,7 +14,7 @@ Read-only macOS forensic helper scripts for bug bounty evidence packets.
 ## Quick start
 
 ```bash
-./run_forensic_suite.sh --input /Volumes/Storage --output /Volumes/Ellis --case atlas_storage --hash-mode all --max-text-mb 16
+./run_forensic_suite.sh --input /Volumes/Storage --output /Volumes/Ellis --case atlas_storage --hash-mode all --max-text-mb 16 --allow-writable
 
 cat > manifest.csv <<'CSV'
 name,suspect_app,baseline_app,process_match,pcap_glob,extra_glob
@@ -27,7 +27,7 @@ python3 scripts/credential_artifact_scanner.py --target ./results/tcc_snapshot.d
 python3 scripts/modification_timeline_scanner.py --target "/Applications/ChatGPT Atlas.app" --output ./results/modification_timeline.tsv --hash
 ```
 
-The suite is intentionally conservative: no bundle mutation, no quarantine stripping, and no execution of suspect binaries. Production recursive runs are intentionally heavy: they create directory-grouped object ledgers, code verification tables, parse/codesign detail files, bundle/package/container checks, keyword scans, and hash manifests. On large evidence volumes, `/Volumes/Ellis` output can be tens of gigabytes. Some live captures, TCC paths, and packet capture workflows may require elevated permissions, but the recursive verifier and static app inventory remain read-only.
+The suite is intentionally conservative: no bundle mutation, no quarantine stripping, and no execution of suspect binaries. Production recursive runs are intentionally heavy: they create directory-grouped object ledgers, code verification tables, parse/codesign detail files, bundle/package/container checks, keyword scans, and hash manifests. On large evidence volumes, `/Volumes/Ellis` output can be tens of gigabytes. The recursive verifier refuses writable sources unless `--allow-writable` is explicit, which is useful when the evidence has already been staged onto `/Volumes/Storage`.
 
 Per-case capture output includes `login_and_truth_scanner_audit/` with shell-history hits for Codex, Truth Scanner, Atlas/OpenAI, PCAP, deletion, and Trash indicators. Review `*.deleted_codex.filtered.txt` files and `trash_codex_paths.txt` when checking for deleted Codex artifacts or related cleanup commands.
 
