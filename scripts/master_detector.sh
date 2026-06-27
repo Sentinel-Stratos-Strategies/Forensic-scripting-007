@@ -14,6 +14,7 @@ RUN_RECURSIVE=1
 HASH_MODE="code"
 LIMIT_FILES=0
 PYTHON_BIN="${PYTHON:-python3}"
+MAX_TEXT_MB=16
 
 usage() {
   cat <<'USAGE'
@@ -25,6 +26,7 @@ Options:
   --case NAME          Case name prefix (default: forensic_suite)
   --hash-mode MODE     Recursive verifier hash mode: code|all|none (default: code)
   --limit-files N      Stop recursive verifier after N regular files per source (default: 0/unlimited)
+  --max-text-mb N      Maximum text-file size searched by recursive verifier (default: 16)
   --python PATH        Python interpreter to run detectors (default: python3 or $PYTHON)
   --no-recursive       Skip recursive volume verification
   -h, --help           Show help
@@ -40,6 +42,7 @@ while (($#)); do
     --case) CASE_NAME="${2:?missing case name}"; shift 2 ;;
     --hash-mode) HASH_MODE="${2:?missing hash mode}"; shift 2 ;;
     --limit-files) LIMIT_FILES="${2:?missing file limit}"; shift 2 ;;
+    --max-text-mb) MAX_TEXT_MB="${2:?missing max text size}"; shift 2 ;;
     --python) PYTHON_BIN="${2:?missing python path}"; shift 2 ;;
     --no-recursive) RUN_RECURSIVE=0; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -50,6 +53,7 @@ done
 [[ -d "$INPUT_ROOT" || -e "$INPUT_ROOT" ]] || { echo "[FATAL] input not found: $INPUT_ROOT" >&2; exit 2; }
 [[ "$HASH_MODE" =~ ^(code|all|none)$ ]] || { echo "[FATAL] bad --hash-mode: $HASH_MODE" >&2; exit 2; }
 [[ "$LIMIT_FILES" =~ ^[0-9]+$ ]] || { echo "[FATAL] --limit-files must be numeric" >&2; exit 2; }
+[[ "$MAX_TEXT_MB" =~ ^[0-9]+$ ]] || { echo "[FATAL] --max-text-mb must be numeric" >&2; exit 2; }
 mkdir -p "$OUTPUT_BASE"
 OUTPUT_BASE="$(cd "$OUTPUT_BASE" && pwd -P)"
 
@@ -90,6 +94,7 @@ run_detector() {
   echo "python=$("$PYTHON_BIN" --version 2>&1 || true)"
   echo "hash_mode=$HASH_MODE"
   echo "limit_files=$LIMIT_FILES"
+  echo "max_text_mb=$MAX_TEXT_MB"
 } > "$OUTPUT_DIR/CASE_MANIFEST.txt"
 
 log "Output directory: $OUTPUT_DIR"
@@ -106,6 +111,7 @@ if (( RUN_RECURSIVE )); then
     --case "${CASE_NAME}_recursive" \
     --hash-mode "$HASH_MODE" \
     --limit-files "$LIMIT_FILES" \
+    --max-text-mb "$MAX_TEXT_MB" \
     "$INPUT_ROOT" >"$OUTPUT_DIR/recursive_verify.stdout" 2>"$OUTPUT_DIR/recursive_verify.stderr" || {
       printf '[WARN] recursive verifier exited non-zero\n' | tee -a "$LOG"
     }
