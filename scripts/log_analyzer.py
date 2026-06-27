@@ -87,10 +87,19 @@ class LogAnalyzer:
                     'permissions': mode
                 })
             
-        except PermissionError:
-            pass
+        except PermissionError as e:
+            issues.append({
+                'type': 'integrity_check_permission_error',
+                'file': log_file,
+                'error': str(e)
+            })
         except Exception as e:
-            pass
+            issues.append({
+                'type': 'integrity_check_error',
+                'file': log_file,
+                'error_type': type(e).__name__,
+                'error': str(e)
+            })
         
         return issues
 
@@ -103,36 +112,51 @@ class LogAnalyzer:
                 return gaps
             
             with open(log_file, 'r', errors='ignore') as f:
-                lines = f.readlines()
+                lines = []
+                for line in f:
+                    lines.append(line)
+                    if len(lines) >= 1000:
+                        break
             
             # Parse timestamps and look for unusual gaps
             timestamps = []
             timestamp_patterns = [
-                r'(\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2})',  # ISO format
-                r'(\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})',  # syslog format
+                (r'(\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2})', 'iso'),  # ISO format
+                (r'(\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})', 'syslog'),  # syslog format
             ]
             
+            current_year = datetime.now().year
+            
             for line in lines[:1000]:  # Sample first 1000 lines
-                for pattern in timestamp_patterns:
+                for pattern, fmt_type in timestamp_patterns:
                     match = re.search(pattern, line)
                     if match:
                         try:
                             ts_str = match.group(1)
-                            # Simple timestamp extraction
-                            timestamps.append(ts_str)
+                            parsed_ts = self._parse_timestamp(ts_str, fmt_type, current_year)
+                            if parsed_ts:
+                                timestamps.append(parsed_ts)
                             break
                         except Exception:
                             continue
             
-            # Check for large gaps (>1 hour)
-            if len(timestamps) > 1:
-                # This is simplified; real analysis would parse timestamps properly
-                gaps.append({
-                    'type': 'timestamp_analysis',
-                    'file': log_file,
-                    'sample_count': len(timestamps),
-                    'note': 'Manual review recommended for gap analysis'
-                })
+            # Check for large gaps (>1 hour) between consecutive timestamps
+            gap_threshold_seconds = 3600  # 1 hour
+            for i in range(1, len(timestamps)):
+                prev_ts = timestamps[i - 1]
+                curr_ts = timestamps[i]
+                gap_seconds = (curr_ts - prev_ts).total_seconds()
+                
+                # Only report positive gaps exceeding the threshold
+                if gap_seconds > gap_threshold_seconds:
+                    gaps.append({
+                        'type': 'timestamp_analysis',
+                        'file': log_file,
+                        'start_time': prev_ts.isoformat(),
+                        'end_time': curr_ts.isoformat(),
+                        'gap_duration_seconds': gap_seconds,
+                        'gap_duration_human': str(timedelta(seconds=int(gap_seconds)))
+                    })
             
         except PermissionError:
             pass
@@ -140,6 +164,33 @@ class LogAnalyzer:
             pass
         
         return gaps
+
+    def _parse_timestamp(self, ts_str, fmt_type, current_year):
+        """Parse a timestamp string into a datetime object.
+        
+        Args:
+            ts_str: The timestamp string to parse
+            fmt_type: 'iso' for ISO format or 'syslog' for syslog format
+            current_year: The year to use for syslog timestamps (which lack year)
+        
+        Returns:
+            A datetime object or None if parsing fails
+        """
+        try:
+            if fmt_type == 'iso':
+                # Handle both space and 'T' separator
+                ts_str_normalized = ts_str.replace('T', ' ')
+                return datetime.strptime(ts_str_normalized, '%Y-%m-%d %H:%M:%S')
+            elif fmt_type == 'syslog':
+                # Syslog format: Mon DD HH:MM:SS (no year)
+                # Normalize whitespace (may have variable spacing between month and day)
+                ts_str_normalized = ' '.join(ts_str.split())
+                parsed = datetime.strptime(ts_str_normalized, '%b %d %H:%M:%S')
+                # Add current year since syslog format doesn't include it
+                return parsed.replace(year=current_year)
+        except ValueError:
+            return None
+        return None
 
     def search_llm_indicators(self, log_file):
         """Search for LLM/AI related entries in logs"""
@@ -165,10 +216,18 @@ class LogAnalyzer:
                     if line_num > self.MAX_LOG_LINES_TO_SCAN:
                         break
             
-        except PermissionError:
-            pass
+        except PermissionError as e:
+            self.findings.append({
+                'type': 'scan_warning',
+                'severity': 'low',
+                'description': f'Permission denied while scanning {log_file}: {e}'
+            })
         except Exception as e:
-            pass
+            self.findings.append({
+                'type': 'scan_warning',
+                'severity': 'low',
+                'description': f'Error scanning {log_file} for LLM indicators: {e}'
+            })
         
         return matches
 
@@ -195,10 +254,18 @@ class LogAnalyzer:
                     if line_num > self.MAX_LOG_LINES_TO_SCAN:
                         break
             
-        except PermissionError:
-            pass
+        except PermissionError as e:
+            self.findings.append({
+                'type': 'scan_warning',
+                'severity': 'low',
+                'description': f'Permission denied while scanning {log_file}: {e}'
+            })
         except Exception as e:
-            pass
+            self.findings.append({
+                'type': 'scan_warning',
+                'severity': 'low',
+                'description': f'Error scanning {log_file} for tampering indicators: {e}'
+            })
         
         return tampering
 
@@ -301,7 +368,7 @@ class LogAnalyzer:
         for log_file in self.log_files:
             matches = self.search_llm_indicators(log_file)
             if matches:
-                for match in matches[:10]:  # Limit per file
+                for match in matches:
                     self.findings.append({
                         'type': 'llm_indicator',
                         **match
@@ -312,7 +379,7 @@ class LogAnalyzer:
         for log_file in self.log_files:
             tampering = self.search_tampering_commands(log_file)
             if tampering:
-                for item in tampering[:10]:
+                for item in tampering:
                     self.findings.append({
                         'type': 'tampering_indicator',
                         **item
@@ -411,6 +478,15 @@ class LogAnalyzer:
             for item in findings_by_type['journal_entry'][:5]:
                 print(f"    Pattern: {item['pattern']}")
                 print(f"    Matches: {item['match_count']}")
+                print()
+        
+        if findings_by_type['timestamp_analysis']:
+            print(f"\n[!] Found {len(findings_by_type['timestamp_analysis'])} timestamp gap(s) exceeding 1 hour:")
+            for item in findings_by_type['timestamp_analysis'][:10]:
+                print(f"    File: {item['file']}")
+                print(f"    Gap start: {item['start_time']}")
+                print(f"    Gap end: {item['end_time']}")
+                print(f"    Duration: {item['gap_duration_human']} ({item['gap_duration_seconds']:.0f} seconds)")
                 print()
         
         print("\n" + "=" * 80)

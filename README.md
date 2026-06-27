@@ -15,7 +15,7 @@ This comprehensive forensic detection suite helps identify hidden AI/LLM process
 - Running unauthorized inference servers
 - Using system resources covertly
 - Manipulating system logs to hide their presence
-- Communicating with external AI/LLM APIs
+- Communicating with external AI/LLM APIs (optional; detectors themselves run offline)
 
 ## 🔍 Detection Methods
 
@@ -65,6 +65,13 @@ Chronological snapshot of recent file changes so you can review what moved when 
 - Highlights entries with credential/tracker-related name hints (beacon, token, keychain, etc.)
 - Emits a JSON timeline plus a concise console summary; non-destructive and read-only
 
+### 7. **Persistence Detection** (`persistence_detector.py`)
+Uncovers stealthy startup mechanisms that can relaunch hidden AI workloads:
+- Cron jobs pointing to model servers or API calls
+- systemd unit files with LLM/AI keywords or API keys
+- Shell profile hooks exporting AI credentials or aliases
+- Curl/wget beacons to public AI endpoints
+
 ## 🚀 Quick Start
 
 ### Installation
@@ -75,11 +82,27 @@ git clone https://github.com/Sentinel-Stratos-Strategies/Forensic-scripting-007.
 cd Forensic-scripting-007
 
 # Install dependencies
-pip install -r requirements.txt
+# pip install -r requirements.txt (if/when added)
 
 # Make scripts executable
 chmod +x scripts/*.sh scripts/*.py
 ```
+
+### Download without git
+
+Prefer a one-time download instead of cloning? Grab the latest ZIP directly from GitHub and unpack it:
+
+```bash
+# Download the current main branch as a ZIP
+wget https://github.com/Sentinel-Stratos-Strategies/Forensic-scripting-007/archive/refs/heads/main.zip -O forensic-suite.zip
+
+# Unpack and enter the directory
+unzip forensic-suite.zip
+cd Forensic-scripting-007-main
+```
+
+For versioned bundles, use the Releases page and pick a tagged archive instead:
+https://github.com/Sentinel-Stratos-Strategies/Forensic-scripting-007/releases
 
 ### Basic Usage
 
@@ -108,6 +131,10 @@ sudo python3 scripts/behavioral_analyzer.py
 # Log analysis
 sudo python3 scripts/log_analyzer.py
 ```
+
+### Offline and API-free operation
+
+All detectors run locally and do not require API keys or internet access. If you want a local LLM to summarize findings, pick one of the offline-friendly models listed in [docs/LOCAL_LLM_OPTIONS.md](docs/LOCAL_LLM_OPTIONS.md) and pipe the reports into it. No cloud calls are needed.
 
 ## 📊 Output
 

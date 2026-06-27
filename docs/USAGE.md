@@ -8,12 +8,15 @@ This suite provides multiple detection methods for identifying hidden AI/LLM pro
 - **Signature-Based Detection**: Matches known LLM/AI framework signatures and patterns
 - **Behavioral Analysis**: Monitors system calls and process behavior in real-time
 - **Log Analysis**: Detects LLM activity and log tampering in system logs
+- **Persistence Detection**: Finds autorun mechanisms that can quietly restart AI workloads
+
+All detectors run locally and do not need internet access or API keys. If you want an offline LLM to help summarize results, see [LOCAL_LLM_OPTIONS](LOCAL_LLM_OPTIONS.md) for drop-in model suggestions.
 
 ## Quick Start
 
 ### Prerequisites
 
-1. **Python 3.6+** is required
+1. **Python 3.7+** is required
 2. Install dependencies:
    ```bash
    pip install -r requirements.txt
@@ -38,6 +41,17 @@ pip install -r requirements.txt
 # Make scripts executable
 chmod +x scripts/*.sh scripts/*.py
 ```
+
+**Need a direct download instead of git?** Grab the ZIP from the main branch:
+
+```bash
+wget https://github.com/Sentinel-Stratos-Strategies/Forensic-scripting-007/archive/refs/heads/main.zip -O forensic-suite.zip
+unzip forensic-suite.zip
+cd Forensic-scripting-007-main
+```
+
+Or pick a tagged archive from Releases for a versioned bundle:
+https://github.com/Sentinel-Stratos-Strategies/Forensic-scripting-007/releases
 
 ## Running the Tools
 
@@ -149,6 +163,24 @@ sudo python3 scripts/log_analyzer.py
 **Output:**
 - Console report with log findings
 - `log_analysis_report.json` - JSON formatted results
+
+#### 5. Persistence Detector
+
+Finds startup hooks that could keep AI/LLM services running after reboot:
+
+```bash
+python3 scripts/persistence_detector.py
+```
+
+**What it detects:**
+- Cron entries that launch model servers or reach out to AI APIs
+- systemd unit files with AI/LLM indicators or embedded API keys
+- Shell profile exports for AI credentials or tooling aliases
+- Scheduled curl/wget calls to public AI endpoints
+
+**Output:**
+- Console report highlighting persistence mechanisms
+- `persistence_report.json` - JSON formatted results
 
 ## Understanding the Reports
 
