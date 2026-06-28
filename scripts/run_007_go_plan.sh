@@ -102,7 +102,7 @@ mkdir -p "$OUT_BASE"
 OUT_BASE="$(cd "$OUT_BASE" && pwd -P)"
 RUN_TS="$(date -u +%Y%m%dT%H%M%SZ)"
 RUN_DIR="$OUT_BASE/${CASE_NAME}_${RUN_TS}"
-mkdir -p "$RUN_DIR"/{logs,database,iphone_host_snapshot,prelaunch,app_watch_pre,live_capture,bundle_inventory,cache_scan,recent_artifacts,hydrate_import,hashes}
+mkdir -p "$RUN_DIR"/{logs,database,iphone_host_snapshot,ios_backup_app_verify,prelaunch,app_watch_pre,live_capture,bundle_inventory,cache_scan,recent_artifacts,hydrate_import,hashes}
 
 LOG="$RUN_DIR/logs/go_plan.log"
 STATUS_FILE="$RUN_DIR/GO_PLAN_STATUS.txt"
@@ -290,6 +290,20 @@ iphone_snapshot() {
     --backup-root "$MOBILE_BACKUP_ROOT"
 }
 
+ios_backup_app_verify() {
+  "$REPO_ROOT/scripts/hydrate/ios_backup_app_verify.py" \
+    --backup-root "$MOBILE_BACKUP_ROOT" \
+    --out-dir "$RUN_DIR/ios_backup_app_verify" \
+    --pattern openai \
+    --pattern chatgpt \
+    --pattern atlas \
+    --pattern chrome \
+    --pattern google \
+    --pattern codex \
+    --pattern perplexity \
+    --pattern comet
+}
+
 app_watch_pre() {
   "$REPO_ROOT/scripts/hydrate/app_watch.py" \
     --apps atlas chrome codex \
@@ -399,6 +413,7 @@ final_manifest() {
     echo "- Databases: \`database/\`"
     echo "- Live capture: \`live_capture/\`"
     echo "- Hydrate/iPhone lane: \`iphone_host_snapshot/\`, \`hydrate_import/\`"
+    echo "- iOS backup app verification: \`ios_backup_app_verify/\`"
     echo "- App evidence: \`app_watch_pre/\`, \`bundle_inventory/\`, \`cache_scan/\`"
     echo "- Recent artifact window: \`recent_artifacts/\`"
     echo "- Hash manifest: \`hashes/HASH_MANIFEST.sha256\`"
@@ -411,6 +426,7 @@ preflight_validate
 phase "preflight and case manifest" write_case_manifest
 phase "initialize 007 databases" init_databases
 phase "iPhone host and MobileSync snapshot" iphone_snapshot
+phase "iOS backup app verification" ios_backup_app_verify
 phase "prelaunch target apps" prelaunch_apps
 phase "pre-live app watch snapshot" app_watch_pre
 phase "live TCC PCAP app-launch recursive capture" live_capture
