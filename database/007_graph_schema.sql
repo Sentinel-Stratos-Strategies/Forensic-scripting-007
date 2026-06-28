@@ -1,5 +1,16 @@
 PRAGMA foreign_keys = ON;
 
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  schema_name TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  applied_at_utc TEXT NOT NULL DEFAULT (datetime('now')),
+  description TEXT,
+  PRIMARY KEY (schema_name, version)
+);
+
+INSERT OR IGNORE INTO schema_migrations(schema_name, version, description)
+VALUES('007_graph', 1, 'Initial 007 graph schema');
+
 CREATE TABLE IF NOT EXISTS nodes (
   node_id TEXT PRIMARY KEY,
   node_type TEXT NOT NULL,

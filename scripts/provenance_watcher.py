@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import hashlib
+import json
 import os
 import queue
 import re
@@ -52,9 +53,10 @@ def sha16(value: str) -> str:
 
 
 class Store:
-    def __init__(self, db_path: Path, raw_limit: int):
+    def __init__(self, db_path: Path, raw_limit: int, max_db_bytes: int):
         self.db_path = db_path
         self.raw_limit = max(1, raw_limit)
+        self.max_db_bytes = max(1024 * 1024, max_db_bytes)
         self.raw_seq = 0
         self.lock = threading.Lock()
         self.conn = sqlite3.connect(str(db_path), check_same_thread=False)
@@ -202,6 +204,8 @@ class Store:
         raw_line: str,
         targets: list[str],
     ) -> None:
+        if self.storage_limit_reached():
+            raise RuntimeError(f"provenance storage limit reached: {self.max_db_bytes} bytes")
         now = utc_now()
         with self.lock:
             self.add_raw(source, raw_line, now)
@@ -222,6 +226,14 @@ class Store:
             )
             self.conn.commit()
 
+    def storage_limit_reached(self) -> bool:
+        total = 0
+        for suffix in ("", "-wal", "-shm"):
+            path = Path(str(self.db_path) + suffix)
+            if path.exists():
+                total += path.stat().st_size
+        return total >= self.max_db_bytes
+
     def add_sample(self, sample_type: str, path: Path, exit_code: int) -> None:
         with self.lock:
             self.conn.execute(
@@ -239,7 +251,6 @@ class Store:
 FS_PID_RX = re.compile(r"\s(?P<proc>[A-Za-z0-9_.() -]{1,80})\.(?P<pid>\d+)\s")
 PATH_RX = re.compile(r"(/(?:Volumes|private|Users|System|Library)/[^\s]+)")
 LOG_PROC_RX = re.compile(r'"processImagePath":"(?P<path>[^"]+)"|"process":"(?P<proc>[^"]+)"')
-LOG_MSG_RX = re.compile(r'"eventMessage":"(?P<msg>(?:\\.|[^"])*)"')
 
 
 def classify_operation(line: str) -> str:
@@ -271,13 +282,15 @@ def parse_fs_usage(line: str) -> tuple[str, int | None, str, str]:
 
 def parse_log_line(line: str) -> tuple[str, int | None, str, str]:
     proc = "unknown"
-    m = LOG_PROC_RX.search(line)
-    if m:
-        proc = Path(m.group("path") or m.group("proc") or "unknown").name
-    msg = line
-    mm = LOG_MSG_RX.search(line)
-    if mm:
-        msg = mm.group("msg").replace("\\/", "/")
+    msg = line[:4000]
+    try:
+        record = json.loads(line)
+        proc = Path(str(record.get("processImagePath") or record.get("process") or "unknown")).name
+        msg = str(record.get("eventMessage") or msg)[:4000]
+    except json.JSONDecodeError:
+        m = LOG_PROC_RX.search(line[:4000])
+        if m:
+            proc = Path(m.group("path") or m.group("proc") or "unknown").name
     return proc, None, classify_operation(msg), msg
 
 
@@ -304,16 +317,21 @@ def reader_thread(
             continue
         process_name, pid, operation, detail = parsers(line)
         path = target_path_from_line(line, targets)
-        store.add_event(
-            source=source,
-            operation=operation,
-            process_name=process_name,
-            pid=pid,
-            path=path,
-            detail=detail,
-            raw_line=line,
-            targets=targets,
-        )
+        try:
+            store.add_event(
+                source=source,
+                operation=operation,
+                process_name=process_name,
+                pid=pid,
+                path=path,
+                detail=detail,
+                raw_line=line,
+                targets=targets,
+            )
+        except RuntimeError as exc:
+            store.put_meta("stop_reason", str(exc))
+            stop.set()
+            break
 
 
 def start_process(args: list[str], stderr_path: Path) -> subprocess.Popen | None:
@@ -386,6 +404,7 @@ def main() -> int:
     parser.add_argument("--duration-seconds", type=int, default=3600)
     parser.add_argument("--sample-interval", type=int, default=300)
     parser.add_argument("--raw-event-limit", type=int, default=100000)
+    parser.add_argument("--max-db-mib", type=int, default=2048)
     parser.add_argument("--target", action="append", default=[])
     parser.add_argument("--no-fs-usage", action="store_true")
     parser.add_argument("--no-log-stream", action="store_true")
@@ -397,10 +416,15 @@ def main() -> int:
     sample_dir.mkdir(exist_ok=True)
     targets = [str(Path(t).expanduser()) for t in (args.target or DEFAULT_TARGETS)]
     db_path = out_dir / "provenance.sqlite3"
-    store = Store(db_path, args.raw_event_limit)
+    if args.duration_seconds < 1 or args.sample_interval < 1 or args.raw_event_limit < 1 or args.max_db_mib < 1:
+        print("[FATAL] duration, interval, raw-event-limit, and max-db-mib must be positive", file=sys.stderr)
+        return 2
+
+    store = Store(db_path, args.raw_event_limit, args.max_db_mib * 1024 * 1024)
     store.put_meta("started_utc", utc_now())
     store.put_meta("duration_seconds", str(args.duration_seconds))
     store.put_meta("raw_event_limit", str(args.raw_event_limit))
+    store.put_meta("max_db_mib", str(args.max_db_mib))
     store.put_meta("targets", "\n".join(targets))
     store.put_meta("pid", str(os.getpid()))
 
@@ -443,6 +467,9 @@ def main() -> int:
     deadline = time.monotonic() + max(1, args.duration_seconds)
     next_sample = time.monotonic()
     while not stop.is_set() and time.monotonic() < deadline:
+        if store.storage_limit_reached():
+            store.put_meta("stop_reason", "max_db_mib reached")
+            break
         if time.monotonic() >= next_sample:
             sample_command(sample_dir, store, "mount", ["mount"])
             sample_command(sample_dir, store, "diskutil_list", ["diskutil", "list"])
@@ -472,6 +499,7 @@ def main() -> int:
         thread.join(timeout=2)
 
     store.put_meta("ended_utc", utc_now())
+    store.put_meta("db_bytes_final", str(sum((Path(str(db_path) + suffix).stat().st_size if Path(str(db_path) + suffix).exists() else 0) for suffix in ("", "-wal", "-shm"))))
     store.close()
     export_views(db_path, out_dir)
     (out_dir / "README.md").write_text(
