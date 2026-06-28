@@ -15,6 +15,8 @@ PCAP_INTERFACE="any"
 RUN_RECURSIVE=1
 RECURSIVE_LIMIT_FILES=0
 RECURSIVE_HASH_MODE="all"
+RUN_PROVENANCE=1
+PROVENANCE_RAW_EVENT_LIMIT=100000
 LAUNCH_APPS=()
 
 usage() {
@@ -32,6 +34,8 @@ Options:
   --no-recursive            Skip recursive verifier after live capture
   --recursive-limit-files N Limit recursive verifier file count (default: 0/unlimited)
   --recursive-hash-mode M   Recursive verifier hash mode: code|all|none (default: all)
+  --no-provenance           Skip targeted provenance watcher
+  --provenance-raw-limit N  Raw provenance ring-buffer row cap (default: 100000)
   -h, --help                Show help
 
 This script is read-only against source apps except for intentionally launching selected app bundles.
@@ -51,6 +55,8 @@ while (($#)); do
     --no-recursive) RUN_RECURSIVE=0; shift ;;
     --recursive-limit-files) RECURSIVE_LIMIT_FILES="${2:?missing limit}"; shift 2 ;;
     --recursive-hash-mode) RECURSIVE_HASH_MODE="${2:?missing hash mode}"; shift 2 ;;
+    --no-provenance) RUN_PROVENANCE=0; shift ;;
+    --provenance-raw-limit) PROVENANCE_RAW_EVENT_LIMIT="${2:?missing raw limit}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "[FATAL] unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -61,6 +67,7 @@ done
 [[ "$SAMPLE_INTERVAL" =~ ^[0-9]+$ ]] || { echo "[FATAL] interval must be numeric" >&2; exit 2; }
 [[ "$RECURSIVE_LIMIT_FILES" =~ ^[0-9]+$ ]] || { echo "[FATAL] recursive limit must be numeric" >&2; exit 2; }
 [[ "$RECURSIVE_HASH_MODE" =~ ^(code|all|none)$ ]] || { echo "[FATAL] recursive hash mode must be code, all, or none" >&2; exit 2; }
+[[ "$PROVENANCE_RAW_EVENT_LIMIT" =~ ^[0-9]+$ ]] || { echo "[FATAL] provenance raw limit must be numeric" >&2; exit 2; }
 [[ -d "$OUT_BASE" ]] || mkdir -p "$OUT_BASE"
 OUT_BASE="$(cd "$OUT_BASE" && pwd -P)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -76,7 +83,7 @@ fi
 
 RUN_TS="$(date -u +%Y%m%dT%H%M%SZ)"
 RUN_DIR="$OUT_BASE/overnight_app_capture_$RUN_TS"
-mkdir -p "$RUN_DIR"/{apps,tcc,pcap,process,logs,recursive,hashes,triage}
+mkdir -p "$RUN_DIR"/{apps,tcc,pcap,process,logs,recursive,provenance,hashes,triage}
 LOG="$RUN_DIR/run.log"
 
 log_msg() { printf '[%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" | tee -a "$LOG"; }
@@ -96,6 +103,8 @@ write_manifest() {
     echo "recursive=$RUN_RECURSIVE"
     echo "recursive_hash_mode=$RECURSIVE_HASH_MODE"
     echo "recursive_limit_files=$RECURSIVE_LIMIT_FILES"
+    echo "provenance=$RUN_PROVENANCE"
+    echo "provenance_raw_event_limit=$PROVENANCE_RAW_EVENT_LIMIT"
     echo "sudo_cached=$(sudo -n true >/dev/null 2>&1 && echo yes || echo no)"
     printf 'launch_app=%s\n' "${LAUNCH_APPS[@]}"
   } > "$RUN_DIR/SESSION_MANIFEST.txt"
@@ -110,8 +119,40 @@ write_manifest() {
   } > "$RUN_DIR/tool_versions.txt"
 }
 
+start_provenance() {
+  if (( ! RUN_PROVENANCE )); then
+    log_msg "Provenance watcher disabled"
+    echo ""
+    return 0
+  fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    log_msg "python3 unavailable; provenance watcher skipped"
+    printf 'python3 unavailable\n' > "$RUN_DIR/provenance/not_started.txt"
+    echo ""
+    return 0
+  fi
+  local duration=$((DURATION_SECONDS + (${#LAUNCH_APPS[@]} * 25) + 120))
+  log_msg "Starting provenance watcher for ${duration}s"
+  python3 "$REPO_ROOT/scripts/provenance_watcher.py" \
+    --out-dir "$RUN_DIR/provenance" \
+    --duration-seconds "$duration" \
+    --sample-interval "$SAMPLE_INTERVAL" \
+    --raw-event-limit "$PROVENANCE_RAW_EVENT_LIMIT" \
+    --target "$SOURCE_ROOT" \
+    --target "$SOURCE_ROOT/Ellis_Archive" \
+    --target "$SOURCE_ROOT/Applications-Staged-From-Sentinel_OS" \
+    --target "/private/var/folders" \
+    --target "$HOME/Library/Application Support/com.openai.atlas" \
+    --target "$HOME/Library/Application Support/Google/Chrome" \
+    > "$RUN_DIR/provenance/provenance_watcher.stdout" \
+    2> "$RUN_DIR/provenance/provenance_watcher.stderr" &
+  echo $!
+}
+
 capture_app_static() {
-  local app="$1" idx="$2" out="$RUN_DIR/apps/$(printf '%02d_%s' "$idx" "$(safe "$(basename "$app")")")"
+  local app="$1"
+  local idx="$2"
+  local out="$RUN_DIR/apps/$(printf '%02d_%s' "$idx" "$(safe "$(basename "$app")")")"
   mkdir -p "$out"
   printf '%s\n' "$app" > "$out/app_path.txt"
   if [[ ! -d "$app" ]]; then
@@ -129,7 +170,8 @@ capture_app_static() {
 }
 
 capture_tcc_snapshot() {
-  local label="$1" out="$RUN_DIR/tcc/$label"
+  local label="$1"
+  local out="$RUN_DIR/tcc/$label"
   mkdir -p "$out"
   local dbs=(
     "$HOME/Library/Application Support/com.apple.TCC/TCC.db"
@@ -212,7 +254,8 @@ launch_apps() {
 }
 
 sample_state() {
-  local label="$1" out="$RUN_DIR/process/$label"
+  local label="$1"
+  local out="$RUN_DIR/process/$label"
   mkdir -p "$out"
   ps auxww > "$out/ps_auxww.txt" 2>&1 || true
   pgrep -afil 'Atlas|ChatGPT|OpenAI|Chrome|Google Chrome|Codex' > "$out/pgrep_targets.txt" 2>&1 || true
@@ -241,12 +284,14 @@ Source root: $SOURCE_ROOT
 4. \`pcap/pcap_hashes.sha256\`, endpoint summaries, DNS TSV, TLS SNI TSV, and HTTP TSV
 5. \`process/*/pgrep_targets.txt\`, \`lsof_network.txt\`, and \`netstat_anv.txt\`
 6. \`logs/correlated_unified_log.log\`
-7. \`recursive/\` if recursive verifier was enabled
-8. \`hashes/GLOBAL_MANIFEST.sha256\`
+7. \`provenance/provenance.sqlite3\`, \`EVENT_AGGREGATES.csv\`, \`PATH_SUMMARY.csv\`, and \`PROCESS_SUMMARY.csv\`
+8. \`recursive/\` if recursive verifier was enabled
+9. \`hashes/GLOBAL_MANIFEST.sha256\`
 
 ## Notes
 
 - This run intentionally launched selected app bundles so TCC, process, log, and network behavior could be correlated in one window.
+- The provenance watcher uses a capped raw-event ring buffer and aggregate SQLite tables to avoid unbounded duplicate logs.
 - System TCC requires root. If unavailable, the run logs not-readable markers and still captures user TCC.
 - PCAP capture depends on local dumpcap/tshark/tcpdump permissions. Review stderr files under \`pcap/\` for capture limitations.
 EOF
@@ -262,6 +307,8 @@ main() {
   log_msg "Capture window starting"
   capture_tcc_snapshot pre
   sample_state pre
+  local provenance_pid=""
+  provenance_pid="$(start_provenance | tail -n 1)"
   local pcap_pid=""
   pcap_pid="$(start_pcap "$DURATION_SECONDS" | tail -n 1)"
   launch_apps
@@ -279,6 +326,9 @@ main() {
 
   if [[ -n "$pcap_pid" ]]; then
     wait "$pcap_pid" 2>/dev/null || true
+  fi
+  if [[ -n "$provenance_pid" ]]; then
+    wait "$provenance_pid" 2>/dev/null || true
   fi
   capture_tcc_snapshot final
   sample_state final

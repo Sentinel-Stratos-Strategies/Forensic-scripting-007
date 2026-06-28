@@ -21,6 +21,10 @@ forensic_reports_*/
 results/
 *.pcap
 *.pcapng
+local_incident_logs/
+reports/*
+!reports/007_GENESIS_HYDRATE_GO_PLAN_20260628.md
+!reports/hydrate_genesis_007_import_map_20260628.md
 
 # Accidental nested checkouts / local working copies
 Forensic-scripting-007/
