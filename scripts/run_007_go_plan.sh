@@ -21,6 +21,7 @@ APP_WATCH_CYCLES=2
 APP_WATCH_INTERVAL=15
 RECENT_MAX_DEPTH=6
 RECENT_HASH_LIMIT=$((8 * 1024 * 1024))
+MIN_FREE_GB=10
 CUTOFF="$(date -u -v-7d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)"
 SMOKE=0
 LAUNCH_APPS=()
@@ -43,6 +44,7 @@ Options:
   --cutoff ISO_TIME           Recent artifact cutoff (default: UTC now minus 7 days on macOS)
   --recent-max-depth N        Recent artifact scan depth (default: 6)
   --recent-hash-limit N       Recent artifact hash size limit (default: 8 MiB)
+  --min-free-gb N             Required free GiB on output volume (default: 10)
   --recursive-hash-mode MODE  code|all|none (default: all)
   --recursive-limit-files N   Recursive verifier file limit (default: 0)
   --no-recursive              Skip recursive verifier inside live capture
@@ -67,6 +69,7 @@ while (($#)); do
     --cutoff) CUTOFF="${2:?missing cutoff}"; shift 2 ;;
     --recent-max-depth) RECENT_MAX_DEPTH="${2:?missing depth}"; shift 2 ;;
     --recent-hash-limit) RECENT_HASH_LIMIT="${2:?missing hash limit}"; shift 2 ;;
+    --min-free-gb) MIN_FREE_GB="${2:?missing free GiB}"; shift 2 ;;
     --recursive-hash-mode) RECURSIVE_HASH_MODE="${2:?missing mode}"; shift 2 ;;
     --recursive-limit-files) RECURSIVE_LIMIT_FILES="${2:?missing limit}"; shift 2 ;;
     --no-recursive) RUN_RECURSIVE=0; shift ;;
@@ -91,6 +94,7 @@ fi
 [[ "$SAMPLE_INTERVAL" =~ ^[0-9]+$ ]] || { echo "[FATAL] bad sample interval" >&2; exit 2; }
 [[ "$RECENT_MAX_DEPTH" =~ ^[0-9]+$ ]] || { echo "[FATAL] bad recent max depth" >&2; exit 2; }
 [[ "$RECENT_HASH_LIMIT" =~ ^[0-9]+$ ]] || { echo "[FATAL] bad recent hash limit" >&2; exit 2; }
+[[ "$MIN_FREE_GB" =~ ^[0-9]+$ ]] || { echo "[FATAL] bad min free GiB" >&2; exit 2; }
 [[ "$RECURSIVE_LIMIT_FILES" =~ ^[0-9]+$ ]] || { echo "[FATAL] bad recursive limit" >&2; exit 2; }
 [[ "$RECURSIVE_HASH_MODE" =~ ^(code|all|none)$ ]] || { echo "[FATAL] recursive hash mode must be code, all, or none" >&2; exit 2; }
 
@@ -116,6 +120,7 @@ log_msg() {
 }
 
 write_status() {
+  local tmp="$STATUS_FILE.tmp.$$"
   {
     echo "run_dir=$RUN_DIR"
     echo "case=$CASE_NAME"
@@ -123,7 +128,39 @@ write_status() {
     echo "phase=${2:-}"
     echo "updated_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "log=$LOG"
-  } > "$STATUS_FILE"
+  } > "$tmp"
+  mv -f "$tmp" "$STATUS_FILE"
+}
+
+preflight_validate() {
+  [[ "$(uname -s)" == "Darwin" ]] || { echo "[FATAL] macOS required for TCC/log/LaunchServices collectors"; return 2; }
+  [[ -d "$SOURCE_ROOT" ]] || { echo "[FATAL] source root missing: $SOURCE_ROOT"; return 2; }
+  [[ -d "$OUT_BASE" ]] || { echo "[FATAL] output root missing: $OUT_BASE"; return 2; }
+  [[ -w "$OUT_BASE" ]] || { echo "[FATAL] output root not writable: $OUT_BASE"; return 2; }
+  local free_kib min_kib
+  free_kib="$(df -k "$OUT_BASE" | awk 'NR==2 {print $4}')"
+  min_kib=$((MIN_FREE_GB * 1024 * 1024))
+  if [[ -n "$free_kib" && "$free_kib" -lt "$min_kib" ]]; then
+    echo "[FATAL] output root has less than ${MIN_FREE_GB}GiB free: $OUT_BASE"
+    return 2
+  fi
+  for tool in python3 find sort shasum; do
+    command -v "$tool" >/dev/null 2>&1 || { echo "[FATAL] required tool missing: $tool"; return 2; }
+  done
+  {
+    echo "preflight_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "uname=$(uname -a)"
+    echo "out_base=$OUT_BASE"
+    echo "source_root=$SOURCE_ROOT"
+    echo "mobile_backup_root=$MOBILE_BACKUP_ROOT"
+    echo "min_free_gb=$MIN_FREE_GB"
+    df -h "$OUT_BASE" "$SOURCE_ROOT" 2>/dev/null || true
+    echo
+    for tool in python3 sqlite3 osascript log system_profiler tshark tcpdump rg grep; do
+      printf '%s=' "$tool"
+      command -v "$tool" || true
+    done
+  } > "$RUN_DIR/PREFLIGHT.txt"
 }
 
 phase() {
@@ -370,6 +407,7 @@ final_manifest() {
 
 write_status "starting" "preflight"
 notify "Starting 007 go-plan launcher"
+preflight_validate
 phase "preflight and case manifest" write_case_manifest
 phase "initialize 007 databases" init_databases
 phase "iPhone host and MobileSync snapshot" iphone_snapshot

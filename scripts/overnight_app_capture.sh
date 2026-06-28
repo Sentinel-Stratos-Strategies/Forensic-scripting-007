@@ -17,6 +17,7 @@ RECURSIVE_LIMIT_FILES=0
 RECURSIVE_HASH_MODE="all"
 RUN_PROVENANCE=1
 PROVENANCE_RAW_EVENT_LIMIT=100000
+PROVENANCE_MAX_DB_MIB=2048
 LAUNCH_APPS=()
 
 usage() {
@@ -36,6 +37,7 @@ Options:
   --recursive-hash-mode M   Recursive verifier hash mode: code|all|none (default: all)
   --no-provenance           Skip targeted provenance watcher
   --provenance-raw-limit N  Raw provenance ring-buffer row cap (default: 100000)
+  --provenance-max-db-mib N Max provenance SQLite+WAL size before watcher stops (default: 2048)
   -h, --help                Show help
 
 This script is read-only against source apps except for intentionally launching selected app bundles.
@@ -57,6 +59,7 @@ while (($#)); do
     --recursive-hash-mode) RECURSIVE_HASH_MODE="${2:?missing hash mode}"; shift 2 ;;
     --no-provenance) RUN_PROVENANCE=0; shift ;;
     --provenance-raw-limit) PROVENANCE_RAW_EVENT_LIMIT="${2:?missing raw limit}"; shift 2 ;;
+    --provenance-max-db-mib) PROVENANCE_MAX_DB_MIB="${2:?missing db MiB limit}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "[FATAL] unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -68,15 +71,20 @@ done
 [[ "$RECURSIVE_LIMIT_FILES" =~ ^[0-9]+$ ]] || { echo "[FATAL] recursive limit must be numeric" >&2; exit 2; }
 [[ "$RECURSIVE_HASH_MODE" =~ ^(code|all|none)$ ]] || { echo "[FATAL] recursive hash mode must be code, all, or none" >&2; exit 2; }
 [[ "$PROVENANCE_RAW_EVENT_LIMIT" =~ ^[0-9]+$ ]] || { echo "[FATAL] provenance raw limit must be numeric" >&2; exit 2; }
+[[ "$PROVENANCE_MAX_DB_MIB" =~ ^[0-9]+$ ]] || { echo "[FATAL] provenance max db MiB must be numeric" >&2; exit 2; }
 [[ -d "$OUT_BASE" ]] || mkdir -p "$OUT_BASE"
 OUT_BASE="$(cd "$OUT_BASE" && pwd -P)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 
 if ((${#LAUNCH_APPS[@]} == 0)); then
+  matcher=(grep -Ei 'Google Chrome\.app$|ChatGPT Atlas.*\.app$|Codex Computer Use\.app$')
+  if command -v rg >/dev/null 2>&1; then
+    matcher=(rg -i 'Google Chrome\.app$|ChatGPT Atlas.*\.app$|Codex Computer Use\.app$')
+  fi
   while IFS= read -r app; do LAUNCH_APPS+=("$app"); done < <(
     find "$SOURCE_ROOT" -maxdepth 7 -type d -name '*.app' 2>/dev/null |
-      rg -i 'Google Chrome\.app$|ChatGPT Atlas.*\.app$|Codex Computer Use\.app$' |
+      "${matcher[@]}" |
       sort
   )
 fi
@@ -105,8 +113,11 @@ write_manifest() {
     echo "recursive_limit_files=$RECURSIVE_LIMIT_FILES"
     echo "provenance=$RUN_PROVENANCE"
     echo "provenance_raw_event_limit=$PROVENANCE_RAW_EVENT_LIMIT"
+    echo "provenance_max_db_mib=$PROVENANCE_MAX_DB_MIB"
     echo "sudo_cached=$(sudo -n true >/dev/null 2>&1 && echo yes || echo no)"
-    printf 'launch_app=%s\n' "${LAUNCH_APPS[@]}"
+    if ((${#LAUNCH_APPS[@]})); then
+      printf 'launch_app=%s\n' "${LAUNCH_APPS[@]}"
+    fi
   } > "$RUN_DIR/SESSION_MANIFEST.txt"
   {
     sw_vers 2>/dev/null || true
@@ -138,6 +149,7 @@ start_provenance() {
     --duration-seconds "$duration" \
     --sample-interval "$SAMPLE_INTERVAL" \
     --raw-event-limit "$PROVENANCE_RAW_EVENT_LIMIT" \
+    --max-db-mib "$PROVENANCE_MAX_DB_MIB" \
     --target "$SOURCE_ROOT" \
     --target "$SOURCE_ROOT/Ellis_Archive" \
     --target "$SOURCE_ROOT/Applications-Staged-From-Sentinel_OS" \
